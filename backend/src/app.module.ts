@@ -21,8 +21,12 @@ import { Pharmacy } from './pharmacies/entities/pharmacy.entity';
         username: configService.get<string>('DB_USERNAME'),
         password: configService.get<string>('DB_PASSWORD'),
         database: configService.get<string>('DB_DATABASE'),
+        url: configService.get<string>('NEON_DB_URL'),
         entities: [User, Pharmacy],
         synchronize: true, // Auto-create tables (Dev ONLY)
+        ssl: {
+          rejectUnauthorized: false,
+        },
       }),
       inject: [ConfigService],
     }),
