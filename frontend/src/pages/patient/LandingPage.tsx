@@ -3,10 +3,10 @@ import type { PatientView } from '../../types';
 
 interface LandingPageProps {
   setCurrentView: (view: PatientView) => void;
-  startVerification: () => void;
+  onFileSelected: (file: File) => void;
 }
 
-export default function LandingPage({ setCurrentView, startVerification }: LandingPageProps) {
+export default function LandingPage({ setCurrentView, onFileSelected }: LandingPageProps) {
   return (
     <>
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-24 animate-in fade-in duration-500">
@@ -53,8 +53,19 @@ export default function LandingPage({ setCurrentView, startVerification }: Landi
 
           <div 
             className="bg-gradient-to-br from-white to-slate-50 rounded-3xl p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 text-center flex flex-col justify-center relative overflow-hidden group hover:border-sky-300 transition-colors cursor-pointer"
-            onClick={startVerification}
+            onClick={() => document.getElementById('prescription-upload')?.click()}
           >
+            <input 
+              type="file" 
+              id="prescription-upload" 
+              className="hidden" 
+              accept="image/*" 
+              onChange={(e) => {
+                if (e.target.files && e.target.files[0]) {
+                  onFileSelected(e.target.files[0]);
+                }
+              }} 
+            />
             <div className="absolute top-0 right-0 -mr-8 -mt-8 w-32 h-32 bg-sky-100 rounded-full blur-2xl opacity-50 group-hover:opacity-100 transition-opacity"></div>
             <div className="mx-auto bg-sky-50 text-[var(--color-brand-blue)] w-20 h-20 rounded-full flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-[var(--color-brand-blue)] group-hover:text-white transition-all duration-300 shadow-inner">
               <Camera size={36} strokeWidth={2.5} />

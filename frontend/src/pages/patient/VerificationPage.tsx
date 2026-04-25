@@ -13,12 +13,15 @@ interface VerificationPageProps {
   saveEdit: () => void;
   handleDelete: (id: string) => void;
   handleAddNew: () => void;
+  uploadedImageUrl: string | null;
+  handleConfirm: () => void;
 }
 
 export default function VerificationPage({
   setCurrentView, medicines, editingId,
   editName, setEditName, isConfirmed, setIsConfirmed,
-  handleEdit, saveEdit, handleDelete, handleAddNew
+  handleEdit, saveEdit, handleDelete, handleAddNew,
+  uploadedImageUrl, handleConfirm
 }: VerificationPageProps) {
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-in fade-in zoom-in-95 duration-300">
@@ -36,7 +39,7 @@ export default function VerificationPage({
           </h2>
           <div className="flex-1 bg-slate-100 rounded-2xl overflow-hidden border border-slate-200 flex items-center justify-center relative group">
             <img 
-              src="/mock-prescription.png" 
+              src={uploadedImageUrl || "/mock-prescription.png"} 
               alt="Prescription Scan" 
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               onError={(e) => {
@@ -134,7 +137,7 @@ export default function VerificationPage({
 
             <button 
               disabled={!isConfirmed || medicines.length === 0}
-              onClick={() => setCurrentView('results')}
+              onClick={handleConfirm}
               className="w-full py-4 rounded-xl font-bold text-lg transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed bg-[var(--color-brand-blue)] text-white hover:bg-[var(--color-brand-blue-hover)] focus:ring-4 focus:ring-sky-200"
             >
               <Search size={20} /> Find Pharmacies Map

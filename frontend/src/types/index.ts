@@ -41,4 +41,4 @@ export interface Registration {
 }
 
 export type UserMode = 'patient' | 'pharmacist' | 'admin';
-export type PatientView = 'landing' | 'verifying' | 'results';
+export type PatientView = 'landing' | 'uploading' | 'verifying' | 'results';
