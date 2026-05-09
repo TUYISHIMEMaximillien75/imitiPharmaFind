@@ -8,6 +8,7 @@ import ReservationModal from './components/patient/ReservationModal';
 import PharmacistDashboard from './pages/pharmacist/PharmacistDashboard';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import type { Medicine, Pharmacy, UserMode, PatientView } from './types';
+import { prescriptionApi } from './services/prescriptionApi';
 
 function App() {
   const [userMode, setUserMode] = useState<UserMode>('patient');
@@ -22,6 +23,8 @@ function App() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [isConfirmed, setIsConfirmed] = useState(false);
+  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
+  const [isOcrLoading, setIsOcrLoading] = useState(false);
 
   // Time state for Open/Closed logic
   const [currentHour, setCurrentHour] = useState(new Date().getHours());
@@ -48,9 +51,40 @@ function App() {
     return currentHour >= p.openTime && currentHour < p.closeTime;
   };
 
-  const startVerification = () => {
-    setCurrentView('verifying');
-    setIsConfirmed(false);
+  const handleFileSelected = async (file: File) => {
+    setCurrentView('uploading');
+    setIsOcrLoading(true);
+    try {
+      const result = await prescriptionApi.uploadPrescription(file);
+      setUploadedImageUrl(`http://localhost:3000${result.imageUrl}`);
+      const extracted = result.medicines.map((name, index) => ({
+        id: Date.now().toString() + index,
+        name
+      }));
+      setMedicines(extracted);
+      setCurrentView('verifying');
+      setIsConfirmed(false);
+    } catch (error) {
+      console.error('Failed to upload', error);
+      // Fallback to empty if it fails
+      setMedicines([]);
+      setUploadedImageUrl(null);
+      setCurrentView('verifying');
+      setIsConfirmed(false);
+    } finally {
+      setIsOcrLoading(false);
+    }
+  };
+
+  const handleConfirmVerification = async () => {
+    if (uploadedImageUrl) {
+      try {
+        await prescriptionApi.savePrescription(medicines.map(m => m.name), uploadedImageUrl.replace('http://localhost:3000', ''));
+      } catch (err) {
+        console.error('Failed to save prescription', err);
+      }
+    }
+    setCurrentView('results');
   };
 
   const handleEdit = (med: Medicine) => { setEditingId(med.id); setEditName(med.name); };
@@ -75,7 +109,15 @@ function App() {
       ) : (
         <>
           {currentView === 'landing' && (
-            <LandingPage setCurrentView={setCurrentView} startVerification={startVerification} />
+            <LandingPage setCurrentView={setCurrentView} onFileSelected={handleFileSelected} />
+          )}
+
+          {currentView === 'uploading' && (
+            <div className="flex-1 flex flex-col items-center justify-center p-8 animate-in fade-in duration-300">
+              <div className="w-24 h-24 border-4 border-sky-100 border-t-[var(--color-brand-blue)] rounded-full animate-spin mb-6"></div>
+              <h2 className="text-2xl font-bold text-slate-800 mb-2">Analyzing Prescription...</h2>
+              <p className="text-slate-500">Extracting medicine names using AI</p>
+            </div>
           )}
 
           {currentView === 'verifying' && (
@@ -87,6 +129,8 @@ function App() {
               isConfirmed={isConfirmed} setIsConfirmed={setIsConfirmed}
               handleEdit={handleEdit} saveEdit={saveEdit}
               handleDelete={handleDelete} handleAddNew={handleAddNew}
+              uploadedImageUrl={uploadedImageUrl}
+              handleConfirm={handleConfirmVerification}
             />
           )}
 
