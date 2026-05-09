@@ -5,6 +5,62 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import logo from '../../assets/system_icon.png';
 
+/** Inline sky-coloured leaf SVG — no extra dependency */
+function LeafIcon({ size = 10 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className="text-sky-400"
+      aria-hidden="true"
+    >
+      {/* Simple filled leaf shape */}
+      <path d="M17 8C8 10 5.9 16.17 3.82 21.34L5.71 22l1-2.3A4.49 4.49 0 0 0 8 20c9 0 11-11 11-11s-1.55 1.07-3 1.82A4.5 4.5 0 0 0 17 8z" />
+    </svg>
+  );
+}
+
+/** Custom ImitiPharmaFind wordmark with sky leaf above the second 'i' */
+function Wordmark() {
+  return (
+    <span className="flex items-baseline gap-0 leading-none select-none">
+      {/* "Im" — dark in light mode, white in dark mode */}
+      <span className="font-extrabold tracking-tight text-slate-800 dark:text-white text-[15px]">
+        Im
+      </span>
+
+      {/* second "i" — sky-tinted with leaf floating above */}
+      <span className="relative inline-block font-extrabold tracking-tight text-sky-500 dark:text-sky-400 text-[15px]" style={{ paddingTop: '6px' }}>
+        {/* leaf — absolute positioned above the dot of the 'i' */}
+        <span
+          className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1"
+          style={{ lineHeight: 0 }}
+        >
+          <LeafIcon size={11} />
+        </span>
+        i
+      </span>
+
+      {/* "ti" — dark/light */}
+      <span className="font-extrabold tracking-tight text-slate-800 dark:text-white text-[15px]">
+        ti
+      </span>
+
+      {/* "Pharma" — sky */}
+      <span className="font-extrabold tracking-tight text-sky-500 text-[15px]">
+        Pharma
+      </span>
+
+      {/* "Find" — muted dark/light for contrast */}
+      <span className="font-extrabold tracking-tight text-slate-600 dark:text-gray-300 text-[15px]">
+        Find
+      </span>
+    </span>
+  );
+}
+
 export default function Header() {
   const { user, isAuthenticated, logout } = useAuth();
   const { toggle, isDark } = useTheme();
@@ -37,14 +93,24 @@ export default function Header() {
     <header className="sticky top-0 z-50 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md border-b border-slate-200 dark:border-gray-800 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
 
-        {/* Logo */}
-        <Link to="/" className="flex items-center gap-2.5 shrink-0 hover:opacity-90 transition-opacity">
-          <img src={logo} alt="ImitiPharmaFind" className="h-9 w-auto object-contain" />
-          <div className="hidden sm:block">
-            <span className="text-base font-extrabold tracking-tight text-slate-800 dark:text-white leading-none">
-              Imiti<span className="text-sky-500">Pharma</span><span className="text-sky-400">Find</span>
-            </span>
-            <p className="text-[10px] text-slate-400 dark:text-gray-500 font-medium leading-none mt-0.5">Musanze · Rwanda</p>
+        {/* Logo + Wordmark */}
+        <Link to="/" className="flex items-center gap-2 shrink-0 group">
+          {/* Icon with a subtle glow ring on hover */}
+          <div className="relative">
+            <div className="absolute inset-0 rounded-xl bg-sky-400/20 scale-0 group-hover:scale-110 transition-transform duration-300" />
+            <img
+              src={logo}
+              alt="ImitiPharmaFind logo"
+              className="h-9 w-9 object-contain relative z-10 drop-shadow-sm"
+            />
+          </div>
+
+          {/* Wordmark */}
+          <div className="hidden sm:flex flex-col gap-0.5">
+            <Wordmark />
+            <p className="text-[10px] text-slate-400 dark:text-gray-600 font-medium tracking-wide leading-none pl-0.5">
+              Musanze · Rwanda
+            </p>
           </div>
         </Link>
 

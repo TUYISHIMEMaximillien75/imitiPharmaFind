@@ -3,7 +3,15 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
-import logo from '../../assets/logo.png';
+import logo from '../../assets/system_icon.png';
+
+function LeafIcon({ size = 10 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className="text-sky-400" aria-hidden="true">
+      <path d="M17 8C8 10 5.9 16.17 3.82 21.34L5.71 22l1-2.3A4.49 4.49 0 0 0 8 20c9 0 11-11 11-11s-1.55 1.07-3 1.82A4.5 4.5 0 0 0 17 8z" />
+    </svg>
+  );
+}
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -49,12 +57,25 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-3 mb-4">
-            <img src={logo} alt="ImitiPharmaFind" className="h-12 w-auto object-contain" />
+            <div className="relative">
+              <div className="absolute inset-0 rounded-xl bg-sky-400/10 blur-md" />
+              <img src={logo} alt="ImitiPharmaFind" className="h-12 w-12 object-contain relative z-10" />
+            </div>
             <div className="text-left">
-              <p className="text-xl font-extrabold text-white tracking-tight leading-none">
-                Imiti<span className="text-sky-400">Pharma</span><span className="text-sky-300">Find</span>
+              {/* Wordmark — same pattern as header */}
+              <p className="text-xl font-extrabold leading-none tracking-tight flex items-baseline gap-0">
+                <span className="text-white">Im</span>
+                <span className="relative inline-flex flex-col items-center text-white">
+                  <span className="absolute -top-2.5 left-1/2 -translate-x-1/2">
+                    <LeafIcon size={9} />
+                  </span>
+                  i
+                </span>
+                <span className="text-white">ti</span>
+                <span className="text-sky-400">Pharma</span>
+                <span className="text-slate-200">Find</span>
               </p>
-              <p className="text-[10px] text-slate-500 mt-0.5">Musanze · Rwanda</p>
+              <p className="text-[10px] text-slate-500 mt-0.5 tracking-wide">Musanze · Rwanda</p>
             </div>
           </div>
           <p className="text-slate-400">Welcome back — sign in to continue</p>
