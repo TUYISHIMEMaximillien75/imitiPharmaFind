@@ -1,6 +1,21 @@
+import { IsArray, IsNotEmpty, IsNumber, IsOptional, IsString, ArrayMinSize } from 'class-validator';
+import { Type } from 'class-transformer';
+
 export class SearchRequestDto {
+  @IsArray()
+  @ArrayMinSize(1, { message: 'At least one medicine name is required' })
+  @IsString({ each: true })
   medicineNames: string[];
+
+  @IsNumber()
+  @Type(() => Number)
   latitude: number;
+
+  @IsNumber()
+  @Type(() => Number)
   longitude: number;
-  insuranceId: string;
+
+  @IsOptional()
+  @IsString()
+  insuranceId?: string;
 }

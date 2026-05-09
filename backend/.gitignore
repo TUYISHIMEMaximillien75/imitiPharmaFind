@@ -42,3 +42,6 @@ lerna-debug.log*
 .env
 .env.test
 .env.production
+
+# Patient prescription uploads — never commit user files to git
+/uploads

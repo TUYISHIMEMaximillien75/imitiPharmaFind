@@ -1,16 +1,48 @@
 @import "tailwindcss";
 
+/* ─── Tailwind v4 dark mode via class on <html> ─── */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ─── Brand tokens ─── */
 @theme {
-  --color-brand-blue: #0ea5e9;
-  --color-brand-blue-hover: #0284c7;
-  --color-text-charcoal: #334155;
-  --color-bg-white: #ffffff;
-  --color-bg-light: #f8fafc;
+  --color-brand:       #0ea5e9;
+  --color-brand-hover: #0284c7;
+  --color-brand-dark:  #38bdf8;
 }
 
-body {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  color: var(--color-text-charcoal);
-  background-color: var(--color-bg-light);
-  -webkit-font-smoothing: antialiased;
+/* ─── Base layer ─── */
+@layer base {
+  :root {
+    color-scheme: light dark;
+  }
+
+  html, body {
+    @apply transition-colors duration-300;
+  }
+
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    @apply bg-slate-50 text-slate-800;
+    @apply dark:bg-gray-950 dark:text-gray-100;
+  }
+
+  /* Scrollbar (dark mode) */
+  html.dark ::-webkit-scrollbar { width: 8px; height: 8px; }
+  html.dark ::-webkit-scrollbar-track { background: #111827; }
+  html.dark ::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
+  html.dark ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+}
+
+/* ─── Utility: glass card used in several pages ─── */
+@layer utilities {
+  .glass {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+  }
+  .dark .glass {
+    background: rgba(17, 24, 39, 0.7);
+    border-color: rgba(255, 255, 255, 0.08);
+  }
 }
