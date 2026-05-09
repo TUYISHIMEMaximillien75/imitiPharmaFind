@@ -13,14 +13,20 @@ export class InventoryItem {
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   price: number;
 
-  @ManyToOne(() => Pharmacy, pharmacy => pharmacy.inventory)
+  @Column({ type: 'int', default: 10 })
+  lowStockThreshold: number;
+
+  @Column({ type: 'date', nullable: true })
+  expiryDate: Date;
+
+  @ManyToOne(() => Pharmacy, (pharmacy) => pharmacy.inventory, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'pharmacyId' })
   pharmacy: Pharmacy;
 
   @Column()
   pharmacyId: string;
 
-  @ManyToOne(() => Medicine)
+  @ManyToOne(() => Medicine, (medicine) => medicine.inventoryItems, { eager: true })
   @JoinColumn({ name: 'medicineId' })
   medicine: Medicine;
 

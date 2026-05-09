@@ -18,6 +18,15 @@ export class User {
   @Column()
   passwordHash: string;
 
+  @Column({ nullable: true })
+  firstName: string;
+
+  @Column({ nullable: true })
+  lastName: string;
+
+  @Column({ nullable: true })
+  phone: string;
+
   @Column({
     type: 'enum',
     enum: UserRole,

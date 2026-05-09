@@ -1,164 +1,131 @@
-import { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useAuth } from './context/AuthContext';
 import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
+import PrivateRoute from './components/router/PrivateRoute';
+
+// Auth pages
+import LoginPage from './pages/auth/LoginPage';
+import RegisterPage from './pages/auth/RegisterPage';
+
+// Patient pages
 import LandingPage from './pages/patient/LandingPage';
+import MyReservationsPage from './pages/patient/MyReservationsPage';
 import VerificationPage from './pages/patient/VerificationPage';
 import SearchResultsPage from './pages/patient/SearchResultsPage';
-import ReservationModal from './components/patient/ReservationModal';
+import ProfilePage from './pages/patient/ProfilePage';
+import PharmacyDetailPage from './pages/patient/PharmacyDetailPage';
+
+// Pharmacist pages
 import PharmacistDashboard from './pages/pharmacist/PharmacistDashboard';
+import PendingApprovalPage from './pages/pharmacist/PendingApprovalPage';
+
+// Admin pages
 import AdminDashboard from './pages/admin/AdminDashboard';
-import type { Medicine, Pharmacy, UserMode, PatientView } from './types';
-import { prescriptionApi } from './services/prescriptionApi';
 
-function App() {
-  const [userMode, setUserMode] = useState<UserMode>('patient');
-  const [currentView, setCurrentView] = useState<PatientView>('landing');
+// Misc
+import UnauthorizedPage from './pages/UnauthorizedPage';
+import NotFoundPage from './pages/NotFoundPage';
 
-  // Verification State
-  const [medicines, setMedicines] = useState<Medicine[]>([
-    { id: '1', name: 'Amoxicillin 500mg' },
-    { id: '2', name: 'Paracetamol 1000mg' },
-    { id: '3', name: 'Vitamin C 500mg' }
-  ]);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editName, setEditName] = useState('');
-  const [isConfirmed, setIsConfirmed] = useState(false);
-  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
-  const [isOcrLoading, setIsOcrLoading] = useState(false);
+/** Smart redirect for root "/" based on user role */
+function HomeRedirect() {
+  const { isAuthenticated, user } = useAuth();
+  if (!isAuthenticated) return <LandingPage />;
+  if (user?.role === 'ADMIN') return <Navigate to="/admin" replace />;
+  if (user?.role === 'PHARMACIST') return <Navigate to="/pharmacist" replace />;
+  return <LandingPage />;
+}
 
-  // Time state for Open/Closed logic
-  const [currentHour, setCurrentHour] = useState(new Date().getHours());
+/** Pharmacist gate: redirect to pending if pharmacy not yet approved */
+function PharmacistGate({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  if (user?.pharmacy && user.pharmacy.status !== 'ACTIVE') {
+    return <PendingApprovalPage />;
+  }
+  return <>{children}</>;
+}
 
-  // Reservation Modal State
-  const [selectedPharmacy, setSelectedPharmacy] = useState<Pharmacy | null>(null);
-  const [reservationStatus, setReservationStatus] = useState<'idle' | 'pending'>('idle');
-  const [pharmacistNotes, setPharmacistNotes] = useState('');
 
-  useEffect(() => {
-    const interval = setInterval(() => setCurrentHour(new Date().getHours()), 60000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Mock Pharmacies
-  const pharmacies: Pharmacy[] = [
-    { id: 1, name: 'Kipharma Musanze', distance: 0.8, openTime: 8, closeTime: 22, medsAvailable: 3, medsTotal: 3, priceTotal: 10000, insurancePays: 8500, userPays: 1500 },
-    { id: 2, name: 'Vine Pharmacy', distance: 1.2, openTime: 8, closeTime: 20, medsAvailable: 3, medsTotal: 3, priceTotal: 11500, insurancePays: 8500, userPays: 3000 },
-    { id: 3, name: 'La Medicale', distance: 2.5, openTime: 0, closeTime: 24, medsAvailable: 2, medsTotal: 3, priceTotal: 5000, insurancePays: 4250, userPays: 750 }
-  ];
-
-  const checkIsOpen = (p: Pharmacy) => {
-    if (p.openTime === 0 && p.closeTime === 24) return true;
-    return currentHour >= p.openTime && currentHour < p.closeTime;
-  };
-
-  const handleFileSelected = async (file: File) => {
-    setCurrentView('uploading');
-    setIsOcrLoading(true);
-    try {
-      const result = await prescriptionApi.uploadPrescription(file);
-      setUploadedImageUrl(`http://localhost:3000${result.imageUrl}`);
-      const extracted = result.medicines.map((name, index) => ({
-        id: Date.now().toString() + index,
-        name
-      }));
-      setMedicines(extracted);
-      setCurrentView('verifying');
-      setIsConfirmed(false);
-    } catch (error) {
-      console.error('Failed to upload', error);
-      // Fallback to empty if it fails
-      setMedicines([]);
-      setUploadedImageUrl(null);
-      setCurrentView('verifying');
-      setIsConfirmed(false);
-    } finally {
-      setIsOcrLoading(false);
-    }
-  };
-
-  const handleConfirmVerification = async () => {
-    if (uploadedImageUrl) {
-      try {
-        await prescriptionApi.savePrescription(medicines.map(m => m.name), uploadedImageUrl.replace('http://localhost:3000', ''));
-      } catch (err) {
-        console.error('Failed to save prescription', err);
-      }
-    }
-    setCurrentView('results');
-  };
-
-  const handleEdit = (med: Medicine) => { setEditingId(med.id); setEditName(med.name); };
-  const saveEdit = () => { setMedicines(medicines.map(m => m.id === editingId ? { ...m, name: editName } : m)); setEditingId(null); };
-  const handleDelete = (id: string) => setMedicines(medicines.filter(m => m.id !== id));
-  const handleAddNew = () => { const newId = Date.now().toString(); setMedicines([...medicines, { id: newId, name: '' }]); setEditingId(newId); setEditName(''); };
-
-  const handleReserveClick = (pharmacy: Pharmacy) => { setSelectedPharmacy(pharmacy); setReservationStatus('idle'); setPharmacistNotes(''); };
-  const sendReservationRequest = () => setReservationStatus('pending');
-  const closeReservationModal = () => setSelectedPharmacy(null);
-
+function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen flex flex-col bg-[var(--color-bg-light)] text-[var(--color-text-charcoal)] font-sans selection:bg-sky-200">
-      
-      <Header userMode={userMode} setUserMode={setUserMode} currentView={currentView} setCurrentView={setCurrentView} />
-
-      {/* DYNAMIC MAIN CONTENT */}
-      {userMode === 'admin' ? (
-        <AdminDashboard />
-      ) : userMode === 'pharmacist' ? (
-        <PharmacistDashboard />
-      ) : (
-        <>
-          {currentView === 'landing' && (
-            <LandingPage setCurrentView={setCurrentView} onFileSelected={handleFileSelected} />
-          )}
-
-          {currentView === 'uploading' && (
-            <div className="flex-1 flex flex-col items-center justify-center p-8 animate-in fade-in duration-300">
-              <div className="w-24 h-24 border-4 border-sky-100 border-t-[var(--color-brand-blue)] rounded-full animate-spin mb-6"></div>
-              <h2 className="text-2xl font-bold text-slate-800 mb-2">Analyzing Prescription...</h2>
-              <p className="text-slate-500">Extracting medicine names using AI</p>
-            </div>
-          )}
-
-          {currentView === 'verifying' && (
-            <VerificationPage 
-              setCurrentView={setCurrentView}
-              medicines={medicines}
-              editingId={editingId}
-              editName={editName} setEditName={setEditName}
-              isConfirmed={isConfirmed} setIsConfirmed={setIsConfirmed}
-              handleEdit={handleEdit} saveEdit={saveEdit}
-              handleDelete={handleDelete} handleAddNew={handleAddNew}
-              uploadedImageUrl={uploadedImageUrl}
-              handleConfirm={handleConfirmVerification}
-            />
-          )}
-
-          {currentView === 'results' && (
-            <SearchResultsPage 
-              setCurrentView={setCurrentView}
-              medicines={medicines}
-              pharmacies={pharmacies}
-              checkIsOpen={checkIsOpen}
-              handleReserveClick={handleReserveClick}
-            />
-          )}
-        </>
-      )}
-
-      <Footer userMode={userMode} currentView={currentView} />
-
-      <ReservationModal 
-        selectedPharmacy={selectedPharmacy}
-        closeReservationModal={closeReservationModal}
-        reservationStatus={reservationStatus}
-        medicines={medicines}
-        pharmacistNotes={pharmacistNotes}
-        setPharmacistNotes={setPharmacistNotes}
-        sendReservationRequest={sendReservationRequest}
-      />
+    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-gray-950 text-slate-800 dark:text-gray-100 font-sans selection:bg-sky-200 dark:selection:bg-sky-800">
+      <Header />
+      <div className="flex-1">{children}</div>
+      <Footer />
     </div>
   );
 }
 
-export default App;
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        {/* ── Public auth routes (no shell) ── */}
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+
+        {/* ── All routes with Header/Footer shell ── */}
+        <Route
+          path="/*"
+          element={
+            <AppLayout>
+              <Routes>
+                {/* Public */}
+                <Route path="/" element={<HomeRedirect />} />
+                <Route path="/unauthorized" element={<UnauthorizedPage />} />
+
+                {/* Patient — search flow (public) */}
+                <Route path="/search" element={<SearchResultsPage />} />
+                <Route path="/verify" element={<VerificationPage />} />
+                <Route path="/pharmacy/:id" element={<PharmacyDetailPage />} />
+
+                {/* Patient */}
+                <Route
+                  path="/my-reservations"
+                  element={
+                    <PrivateRoute allowedRoles={['PATIENT']}>
+                      <MyReservationsPage />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="/profile"
+                  element={
+                    <PrivateRoute allowedRoles={['PATIENT', 'PHARMACIST', 'ADMIN']}>
+                      <ProfilePage />
+                    </PrivateRoute>
+                  }
+                />
+
+                {/* Pharmacist */}
+                <Route
+                  path="/pharmacist"
+                  element={
+                    <PrivateRoute allowedRoles={['PHARMACIST']}>
+                      <PharmacistGate>
+                        <PharmacistDashboard />
+                      </PharmacistGate>
+                    </PrivateRoute>
+                  }
+                />
+
+                {/* Admin */}
+                <Route
+                  path="/admin"
+                  element={
+                    <PrivateRoute allowedRoles={['ADMIN']}>
+                      <AdminDashboard />
+                    </PrivateRoute>
+                  }
+                />
+
+                {/* Fallback 404 */}
+                <Route path="*" element={<NotFoundPage />} />
+              </Routes>
+            </AppLayout>
+          }
+        />
+      </Routes>
+    </BrowserRouter>
+  );
+}
