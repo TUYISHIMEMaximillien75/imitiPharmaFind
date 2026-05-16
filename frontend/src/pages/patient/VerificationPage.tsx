@@ -1,148 +1,138 @@
-import { Camera, AlertTriangle, ArrowLeft, Save, Trash2, Edit2, PlusCircle, CheckCircle, Search } from 'lucide-react';
-import type { Medicine, PatientView } from '../../types';
+import { useState } from 'react';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
+import { CheckCircle, Pencil, Trash2, Plus, Save, X, AlertCircle, ArrowLeft } from 'lucide-react';
+import api from '../../services/api';
 
-interface VerificationPageProps {
-  setCurrentView: (view: PatientView) => void;
-  medicines: Medicine[];
-  editingId: string | null;
-  editName: string;
-  setEditName: (name: string) => void;
-  isConfirmed: boolean;
-  setIsConfirmed: (val: boolean) => void;
-  handleEdit: (med: Medicine) => void;
-  saveEdit: () => void;
-  handleDelete: (id: string) => void;
-  handleAddNew: () => void;
-  uploadedImageUrl: string | null;
-  handleConfirm: () => void;
-}
+interface Medicine { id: string; name: string }
 
-export default function VerificationPage({
-  setCurrentView, medicines, editingId,
-  editName, setEditName, isConfirmed, setIsConfirmed,
-  handleEdit, saveEdit, handleDelete, handleAddNew,
-  uploadedImageUrl, handleConfirm
-}: VerificationPageProps) {
+export default function VerificationPage() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const state = location.state as { medicines?: Medicine[]; imageUrl?: string } | null;
+
+  const [medicines, setMedicines] = useState<Medicine[]>(state?.medicines || []);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  if (!state?.medicines) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <AlertCircle size={48} className="text-amber-500" />
+        <p className="text-slate-600">No prescription data found. Please go back and upload one.</p>
+        <Link to="/" className="px-5 py-2.5 bg-sky-500 text-white rounded-xl font-semibold">Back to Search</Link>
+      </div>
+    );
+  }
+
+  const startEdit = (med: Medicine) => { setEditingId(med.id); setEditName(med.name); };
+  const saveEdit = () => {
+    setMedicines(medicines.map(m => m.id === editingId ? { ...m, name: editName } : m));
+    setEditingId(null);
+  };
+  const deleteMed = (id: string) => setMedicines(medicines.filter(m => m.id !== id));
+  const addMed = () => {
+    const id = Date.now().toString();
+    setMedicines([...medicines, { id, name: '' }]);
+    setEditingId(id);
+    setEditName('');
+  };
+
+  const handleConfirm = async () => {
+    const validMeds = medicines.filter(m => m.name.trim());
+    if (validMeds.length === 0) return;
+    setIsSaving(true);
+    try {
+      if (state?.imageUrl) {
+        await api.post('/prescriptions', {
+          medicines: validMeds.map(m => m.name),
+          imageUrl: state.imageUrl.replace('http://localhost:3000', ''),
+        });
+      }
+    } catch { /* non-blocking */ }
+    navigate('/search', { state: { medicines: validMeds.map(m => m.name) } });
+  };
+
   return (
-    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-in fade-in zoom-in-95 duration-300">
-      <button 
-        onClick={() => setCurrentView('landing')}
-        className="flex items-center gap-2 text-slate-500 hover:text-[var(--color-brand-blue)] mb-6 font-semibold transition-colors"
-      >
-        <ArrowLeft size={20} /> Back to Search
-      </button>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-full min-h-[600px]">
-        <div className="bg-white rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 flex flex-col h-full">
-          <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-slate-800">
-            <Camera className="text-[var(--color-brand-blue)]" size={24} />
-            Uploaded Prescription
-          </h2>
-          <div className="flex-1 bg-slate-100 rounded-2xl overflow-hidden border border-slate-200 flex items-center justify-center relative group">
-            <img 
-              src={uploadedImageUrl || "/mock-prescription.png"} 
-              alt="Prescription Scan" 
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.src = 'https://placehold.co/600x800/e2e8f0/64748b?text=Prescription+Scan';
-              }}
-            />
-            <div className="absolute inset-0 bg-sky-900/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-              <span className="bg-white/90 backdrop-blur text-sm font-semibold px-4 py-2 rounded-full shadow-lg text-slate-700">Scan Analyzed</span>
+    <main className="max-w-4xl mx-auto px-4 sm:px-6 py-10 animate-in fade-in duration-500">
+      <Link to="/" className="flex items-center gap-2 text-slate-500 hover:text-sky-600 mb-6 font-semibold transition-colors text-sm">
+        <ArrowLeft size={16} /> Back to Search
+      </Link>
+
+      <div className="mb-8">
+        <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Verify Extracted Medicines</h1>
+        <p className="text-slate-500 mt-2">We extracted these medicines from your prescription. Review and correct before searching.</p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Prescription preview */}
+        {state?.imageUrl && (
+          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
+            <h2 className="font-bold text-slate-700 mb-4 text-sm uppercase tracking-wider">Your Prescription</h2>
+            <div className="rounded-2xl overflow-hidden border border-slate-100 bg-slate-50">
+              <img src={state.imageUrl} alt="Prescription" className="w-full object-contain max-h-80" />
             </div>
           </div>
-        </div>
+        )}
 
-        <div className="bg-white rounded-3xl p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 flex flex-col h-full">
-          <h2 className="text-2xl font-bold mb-6 text-slate-800">Extracted Medicines</h2>
-          <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-2xl flex items-start gap-3 mb-8 shadow-sm">
-            <AlertTriangle className="shrink-0 mt-0.5" size={20} />
-            <div>
-              <h3 className="font-semibold text-amber-900">⚠️ Please verify extracted names</h3>
-              <p className="text-sm mt-1 opacity-90">Auto-extraction may have errors due to handwriting. Review and correct the list below.</p>
-            </div>
-          </div>
+        {/* Medicine list editor */}
+        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-col">
+          <h2 className="font-bold text-slate-700 mb-4 text-sm uppercase tracking-wider">Extracted Medicines ({medicines.length})</h2>
 
-          <div className="flex-1 space-y-4 overflow-y-auto pr-2 custom-scrollbar">
-            {medicines.map((med) => (
-              <div key={med.id} className="group bg-slate-50 hover:bg-sky-50 transition-colors border border-slate-200 hover:border-sky-200 rounded-xl p-4 flex items-center justify-between">
+          <div className="flex-1 space-y-2 mb-4">
+            {medicines.map(med => (
+              <div key={med.id} className="flex items-center gap-2 bg-slate-50 rounded-xl px-4 py-3 border border-slate-100 group hover:border-sky-200 transition-all">
                 {editingId === med.id ? (
-                  <div className="flex-1 flex gap-2 w-full">
-                    <input 
-                      type="text" 
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      className="flex-1 px-3 py-2 border-2 border-[var(--color-brand-blue)] rounded-lg focus:outline-none"
+                  <>
+                    <input
                       autoFocus
-                      onKeyDown={(e) => e.key === 'Enter' && saveEdit()}
+                      type="text"
+                      value={editName}
+                      onChange={e => setEditName(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && saveEdit()}
+                      className="flex-1 bg-transparent outline-none text-slate-800 text-sm"
+                      placeholder="Medicine name..."
                     />
-                    <button onClick={saveEdit} className="bg-[var(--color-brand-blue)] text-white p-2 rounded-lg hover:bg-[var(--color-brand-blue-hover)]">
-                      <Save size={20} />
-                    </button>
-                  </div>
+                    <button onClick={saveEdit} className="text-green-500 hover:text-green-700"><Save size={16} /></button>
+                    <button onClick={() => setEditingId(null)} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
+                  </>
                 ) : (
                   <>
-                    <div className="flex items-center gap-3">
-                      <div className="bg-white w-8 h-8 rounded-full shadow-sm flex items-center justify-center border border-slate-200 text-slate-400">
-                        <CheckCircle size={16} />
-                      </div>
-                      <span className="font-medium text-lg text-slate-700">{med.name || <span className="text-slate-400 italic">Empty Name</span>}</span>
-                    </div>
-                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button 
-                        onClick={() => handleEdit(med)}
-                        className="p-2 text-slate-500 hover:text-[var(--color-brand-blue)] hover:bg-sky-100 rounded-lg transition-colors"
-                        title="Edit"
-                      >
-                        <Edit2 size={18} />
-                      </button>
-                      <button 
-                        onClick={() => handleDelete(med.id)}
-                        className="p-2 text-slate-500 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Delete"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    </div>
+                    <CheckCircle size={16} className="text-sky-500 shrink-0" />
+                    <span className="flex-1 text-sm font-medium text-slate-800">{med.name || <em className="text-slate-400">Unnamed</em>}</span>
+                    <button onClick={() => startEdit(med)} className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-sky-500 transition-all"><Pencil size={14} /></button>
+                    <button onClick={() => deleteMed(med.id)} className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-500 transition-all"><Trash2 size={14} /></button>
                   </>
                 )}
               </div>
             ))}
-            <button 
-              onClick={handleAddNew}
-              className="w-full mt-4 py-4 border-2 border-dashed border-slate-300 hover:border-[var(--color-brand-blue)] text-slate-500 hover:text-[var(--color-brand-blue)] rounded-xl font-semibold flex items-center justify-center gap-2 transition-colors bg-white hover:bg-sky-50"
-            >
-              <PlusCircle size={20} /> Add New Medicine
-            </button>
+
+            {medicines.length === 0 && (
+              <div className="text-center py-8 text-slate-400 text-sm">
+                No medicines extracted. Add them manually below.
+              </div>
+            )}
           </div>
 
-          <div className="mt-8 pt-6 border-t border-slate-100">
-            <label className="flex items-start gap-3 cursor-pointer group mb-6">
-              <div className="relative flex items-center justify-center mt-1">
-                <input 
-                  type="checkbox" 
-                  className="sr-only peer"
-                  checked={isConfirmed}
-                  onChange={(e) => setIsConfirmed(e.target.checked)}
-                />
-                <div className="w-6 h-6 border-2 border-slate-300 rounded-md peer-checked:bg-[var(--color-brand-blue)] peer-checked:border-[var(--color-brand-blue)] transition-colors flex items-center justify-center group-hover:border-[var(--color-brand-blue)]">
-                  {isConfirmed && <CheckCircle size={16} className="text-white" />}
-                </div>
-              </div>
-              <div>
-                <span className="text-slate-800 font-semibold block">I confirm this list matches my prescription</span>
-                <span className="text-sm text-slate-500 block">By checking this box, you agree that PharmaLocate Musanze will search for these exact items.</span>
-              </div>
-            </label>
+          <button
+            onClick={addMed}
+            className="flex items-center gap-2 text-sm text-sky-600 hover:text-sky-700 font-semibold mb-4 transition-colors"
+          >
+            <Plus size={16} /> Add medicine manually
+          </button>
 
-            <button 
-              disabled={!isConfirmed || medicines.length === 0}
-              onClick={handleConfirm}
-              className="w-full py-4 rounded-xl font-bold text-lg transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed bg-[var(--color-brand-blue)] text-white hover:bg-[var(--color-brand-blue-hover)] focus:ring-4 focus:ring-sky-200"
-            >
-              <Search size={20} /> Find Pharmacies Map
-            </button>
-          </div>
+          <button
+            id="confirm-verify-btn"
+            onClick={handleConfirm}
+            disabled={medicines.filter(m => m.name.trim()).length === 0 || isSaving}
+            className="w-full bg-sky-500 hover:bg-sky-600 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-sky-500/20 flex items-center justify-center gap-2"
+          >
+            {isSaving ? (
+              <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving...</>
+            ) : (
+              <><CheckCircle size={18} /> Confirm & Search Pharmacies</>
+            )}
+          </button>
         </div>
       </div>
     </main>
