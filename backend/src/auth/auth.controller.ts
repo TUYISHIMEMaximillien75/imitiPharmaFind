@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards, Request } from '@nestjs/common';
+import { Controller, Post, Get, Body, UseGuards, Request } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Throttle, SkipThrottle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
@@ -32,5 +32,14 @@ export class AuthController {
   async refresh(@Request() req: any) {
     return this.authService.refresh(req.user.id);
   }
+
+  /** Get current user profile — used by polling to detect pharmacy approval */
+  @SkipThrottle()
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  async me(@Request() req: any) {
+    return this.authService.refresh(req.user.id);
+  }
 }
+
 

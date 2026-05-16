@@ -24,6 +24,7 @@ import { ReservationItem } from './reservations/entities/reservation-item.entity
 import { ReservationsModule } from './reservations/reservations.module';
 import { PharmaciesModule } from './pharmacies/pharmacies.module';
 import { UsersModule } from './users/users.module';
+import { PharmacyInsurance } from './pharmacies/entities/pharmacy-insurance.entity';
 
 
 @Module({
@@ -83,6 +84,7 @@ import { UsersModule } from './users/users.module';
           entities: [
             User,
             Pharmacy,
+            PharmacyInsurance,
             Insurance,
             Prescription,
             Medicine,

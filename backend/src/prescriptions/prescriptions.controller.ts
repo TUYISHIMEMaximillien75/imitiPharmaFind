@@ -3,8 +3,12 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { PrescriptionsService } from './prescriptions.service';
 import { SavePrescriptionDto } from './dto/save-prescription.dto';
 import { diskStorage } from 'multer';
-import { extname } from 'path';
+import { extname, join } from 'path';
+import { mkdirSync } from 'fs';
 import type { Express } from 'express';
+
+const UPLOAD_DIR = join(process.cwd(), 'uploads', 'prescriptions');
+mkdirSync(UPLOAD_DIR, { recursive: true }); // ensure folder exists
 
 @Controller('prescriptions')
 export class PrescriptionsController {
@@ -13,7 +17,7 @@ export class PrescriptionsController {
   @Post('temp-verify')
   @UseInterceptors(FileInterceptor('file', {
     storage: diskStorage({
-      destination: './uploads/prescriptions',
+      destination: UPLOAD_DIR,
       filename: (req, file, cb) => {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
         cb(null, `${uniqueSuffix}${extname(file.originalname)}`);

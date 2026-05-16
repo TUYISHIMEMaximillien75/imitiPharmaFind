@@ -44,9 +44,8 @@ async function bootstrap() {
   );
 
   /* ── Static uploads ── */
-  app.useStaticAssets(join(__dirname, '..', 'uploads'), {
-    prefix: '/uploads',
-  });
+  const uploadsPath = join(process.cwd(), 'uploads');
+  app.useStaticAssets(uploadsPath, { prefix: '/uploads' });
 
   /* ── Swagger / OpenAPI ── */
   if (process.env.NODE_ENV !== 'production') {

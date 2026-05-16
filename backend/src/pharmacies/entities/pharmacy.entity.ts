@@ -1,8 +1,12 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, OneToOne, JoinColumn, ManyToMany, JoinTable, OneToMany } from 'typeorm';
+import {
+  Entity, PrimaryGeneratedColumn, Column,
+  CreateDateColumn, OneToOne, JoinColumn,
+  OneToMany,
+} from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { Location } from '../../locations/entities/location.embeddable';
-import { Insurance } from '../../insurances/entities/insurance.entity';
 import { InventoryItem } from '../../inventory/entities/inventory-item.entity';
+import { PharmacyInsurance } from './pharmacy-insurance.entity';
 
 export enum PharmacyStatus {
   PENDING = 'PENDING',
@@ -40,9 +44,9 @@ export class Pharmacy {
   @Column(() => Location)
   location: Location;
 
-  @ManyToMany(() => Insurance, (insurance) => insurance.pharmacies)
-  @JoinTable()
-  insurances: Insurance[];
+  /** Explicit pivot so each pharmacy can override the coverage % per insurance */
+  @OneToMany(() => PharmacyInsurance, (pi) => pi.pharmacy, { cascade: true })
+  pharmacyInsurances: PharmacyInsurance[];
 
   @OneToMany(() => InventoryItem, (inventoryItem) => inventoryItem.pharmacy)
   inventory: InventoryItem[];

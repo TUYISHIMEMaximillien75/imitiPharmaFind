@@ -25,15 +25,12 @@ export class SearchService {
       return [];
     }
 
-    // Build ILIKE conditions for case-insensitive partial name matching
-    // e.g. "amlodipine 5mg" will match "Amlodipine 5mg" in the DB
     const query = this.pharmacyRepository.createQueryBuilder('pharmacy')
-      // --- Insurance: optional filter (LEFT JOIN + conditional WHERE) ---
-      .leftJoin('pharmacy.insurances', 'insurance')
+      .leftJoin('pharmacy.pharmacyInsurances', 'pi')
+      .leftJoin('pi.insurance', 'insurance')
       .innerJoin('pharmacy.inventory', 'inventory', 'inventory.stock > 0')
       .innerJoin('inventory.medicine', 'medicine')
       .where(
-        // At least one of the searched names matches (case-insensitive) for each inventory row
         medicineNames
           .map((_, i) => `medicine.name ILIKE :med${i}`)
           .join(' OR '),
@@ -41,7 +38,6 @@ export class SearchService {
       )
       .andWhere('inventory.stock > 0')
       .andWhere('pharmacy.status = :status', { status: 'ACTIVE' });
-
 
     // Optional insurance filter
     if (insuranceId) {
@@ -63,20 +59,22 @@ export class SearchService {
       .setParameters({ latitude, longitude })
       .groupBy('pharmacy.id')
       .orderBy('distance', 'ASC')
-      .limit(3);
+      .limit(10);
 
     const { entities, raw } = await query.getRawAndEntities();
 
     this.logger.log(`Found ${entities.length} matching pharmacies`);
 
-    // Enrich each result with matched medicine details and distance
+    // Enrich each result with matched medicine details, insurance coverage, and distance
     const enriched = await Promise.all(
       entities.map(async (pharmacy, idx) => {
-        // Reload inventory with medicine details for this pharmacy
+        // Reload inventory with medicine details and pharmacy insurances
         const detail = await this.pharmacyRepository
           .createQueryBuilder('p')
           .leftJoinAndSelect('p.inventory', 'inv')
           .leftJoinAndSelect('inv.medicine', 'med')
+          .leftJoinAndSelect('p.pharmacyInsurances', 'pi')
+          .leftJoinAndSelect('pi.insurance', 'ins')
           .where('p.id = :id', { id: pharmacy.id })
           .getOne();
 
@@ -92,6 +90,7 @@ export class SearchService {
             name: inv.medicine?.name,
             price: inv.price,
             stock: inv.stock,
+            imageUrl: (inv.medicine as any)?.imageUrl ?? null,
           }));
 
         const totalPrice = availableMeds.reduce((sum, m) => sum + Number(m.price), 0);
@@ -101,21 +100,27 @@ export class SearchService {
             ? h >= pharmacy.openingTime && h < pharmacy.closingTime
             : h >= pharmacy.openingTime || h < pharmacy.closingTime;
 
+        // Map pharmacyInsurances for the result
+        const insurances = (detail?.pharmacyInsurances ?? []).map((pi) => ({
+          id: pi.insurance?.id,
+          providerName: pi.insurance?.providerName,
+          coveragePercentage: pi.coveragePercentage ?? pi.insurance?.defaultCoveragePercentage,
+        }));
+
         return {
           ...pharmacy,
           distance: raw[idx]?.distance ?? null,
           availableMeds,
           totalPrice,
           isOpen,
+          insurances,
         };
       }),
     );
 
     return enriched.sort((a, b) => {
-      // Open pharmacies always appear first
       if (a.isOpen && !b.isOpen) return -1;
       if (!a.isOpen && b.isOpen) return 1;
-      // Within same open/closed group, sort by distance
       return (a.distance ?? Infinity) - (b.distance ?? Infinity);
     });
   }

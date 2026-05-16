@@ -33,6 +33,9 @@ export class Medicine {
   @Column({ nullable: true, type: 'text' })
   description: string;
 
+  @Column({ nullable: true, type: 'text' })
+  imageUrl: string;
+
   @Column({ default: false })
   requiresPrescription: boolean;
 
