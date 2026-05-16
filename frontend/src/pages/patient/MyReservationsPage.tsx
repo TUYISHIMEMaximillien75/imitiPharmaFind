@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
-import { ClipboardList, Package, Clock, CheckCircle, XCircle, AlertCircle, ChevronRight, X } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { ClipboardList, Package, Clock, CheckCircle, XCircle, AlertCircle, ChevronRight, X, Bell } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 
 interface ReservationItem {
@@ -22,14 +23,15 @@ interface Reservation {
 }
 
 const STATUS_CONFIG = {
-  PENDING:   { label: 'Pending',   color: 'text-amber-600',  bg: 'bg-amber-50  border-amber-200',  icon: Clock },
-  CONFIRMED: { label: 'Confirmed', color: 'text-green-600',  bg: 'bg-green-50  border-green-200',  icon: CheckCircle },
-  REJECTED:  { label: 'Rejected',  color: 'text-red-600',    bg: 'bg-red-50    border-red-200',    icon: XCircle },
-  COMPLETED: { label: 'Completed', color: 'text-sky-600',    bg: 'bg-sky-50    border-sky-200',    icon: CheckCircle },
-  CANCELLED: { label: 'Cancelled', color: 'text-slate-500',  bg: 'bg-slate-50  border-slate-200',  icon: X },
+  PENDING:   { labelKey: 'reservations.pending',   color: 'text-amber-600',  bg: 'bg-amber-50  border-amber-200',  icon: Clock },
+  CONFIRMED: { labelKey: 'reservations.confirmed', color: 'text-green-600',  bg: 'bg-green-50  border-green-200',  icon: CheckCircle },
+  REJECTED:  { labelKey: 'reservations.rejected',  color: 'text-red-600',    bg: 'bg-red-50    border-red-200',    icon: XCircle },
+  COMPLETED: { labelKey: 'reservations.completed', color: 'text-sky-600',    bg: 'bg-sky-50    border-sky-200',    icon: CheckCircle },
+  CANCELLED: { labelKey: 'reservations.cancelled', color: 'text-slate-500',  bg: 'bg-slate-50  border-slate-200',  icon: X },
 };
 
 export default function MyReservationsPage() {
+  const { t } = useTranslation();
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -38,26 +40,59 @@ export default function MyReservationsPage() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
 
-  const fetchReservations = async (p = 1, append = false) => {
+  // Issue #6 — real-time status change notification
+  const [changedIds, setChangedIds] = useState<{ id: string; newStatus: string }[]>([]);
+  const knownStatuses = useRef<Map<string, string>>(new Map());
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // silent=true → background poll; errors are swallowed so a blip doesn't pollute the UI
+  const fetchReservations = async (p = 1, append = false, silent = false) => {
+    if (!silent) setError('');   // clear any previous error before a user-initiated fetch
     try {
       const res = await api.get(`/reservations?page=${p}&limit=10`);
       const data: Reservation[] = res.data;
+
+      // Detect status changes since last poll
+      const changes: { id: string; newStatus: string }[] = [];
+      if (knownStatuses.current.size > 0) {
+        data.forEach(r => {
+          const prev = knownStatuses.current.get(r.id);
+          if (prev && prev !== r.status && (r.status === 'CONFIRMED' || r.status === 'REJECTED')) {
+            changes.push({ id: r.id, newStatus: r.status });
+          }
+        });
+      }
+      // Update known statuses map
+      data.forEach(r => knownStatuses.current.set(r.id, r.status));
+
+      if (changes.length > 0) {
+        setChangedIds(prev => [...prev, ...changes]);
+      }
+
+      setError('');  // clear any previous error on success
       setReservations(prev => append ? [...prev, ...data] : data);
       setHasMore(data.length === 10);
     } catch {
-      setError('Failed to load reservations');
+      // Only show error on explicit user-triggered fetches, not background polls
+      if (!silent) setError('Failed to load reservations');
     } finally {
       setIsLoading(false);
     }
   };
 
-  useEffect(() => { fetchReservations(1); }, []);
+  useEffect(() => {
+    fetchReservations(1);
+    // Poll silently every 15 seconds — errors are swallowed so temporary
+    // network blips don't show the error banner over an already-loaded list
+    pollRef.current = setInterval(() => fetchReservations(1, false, true), 15_000);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, []);
 
   const handleCancel = async (id: string) => {
     setCancelling(id);
     try {
       await api.patch(`/reservations/${id}/cancel`);
-      await fetchReservations(1);
+      await fetchReservations(1);  // explicit, not silent → error will show if it fails
       setPage(1);
       setSelected(null);
     } catch (err: any) {
@@ -74,10 +109,40 @@ export default function MyReservationsPage() {
           <ClipboardList size={24} className="text-sky-600 dark:text-sky-400" />
         </div>
         <div>
-          <h1 className="text-2xl font-extrabold text-slate-800 dark:text-white">My Reservations</h1>
-          <p className="text-slate-500 dark:text-gray-400 text-sm mt-0.5">Track all your medicine reservation requests</p>
+          <h1 className="text-2xl font-extrabold text-slate-800 dark:text-white">{t('reservations.title')}</h1>
+          <p className="text-slate-500 dark:text-gray-400 text-sm mt-0.5">{t('reservations.subtitle')}</p>
         </div>
       </div>
+
+      {/* Real-time status change notifications (Issue #6) */}
+      {changedIds.length > 0 && (
+        <div className="mb-6 space-y-2">
+          {changedIds.map((c, i) => {
+            const r = reservations.find(x => x.id === c.id);
+            return (
+              <div
+                key={i}
+                className={`flex items-center justify-between gap-3 rounded-2xl p-4 border text-sm font-medium ${
+                  c.newStatus === 'CONFIRMED'
+                    ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-400'
+                    : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-400'
+                }`}
+              >
+                <span className="flex items-center gap-2">
+                  <Bell size={15} />
+                  {r ? r.pharmacy.name : 'A pharmacy'} has {c.newStatus === 'CONFIRMED' ? t('reservations.confirmed_action') : t('reservations.rejected_action')} {t('reservations.subtitle').split(' ')[0].toLowerCase()}
+                </span>
+                <button
+                  onClick={() => setChangedIds(prev => prev.filter((_, j) => j !== i))}
+                  className="shrink-0 opacity-60 hover:opacity-100"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {isLoading && (
         <div className="flex justify-center py-16">
@@ -96,8 +161,8 @@ export default function MyReservationsPage() {
           <div className="w-20 h-20 bg-slate-100 dark:bg-gray-800 rounded-3xl flex items-center justify-center mx-auto mb-4">
             <Package size={36} className="text-slate-400 dark:text-gray-600" />
           </div>
-          <h3 className="text-lg font-bold text-slate-700 dark:text-gray-200 mb-1">No reservations yet</h3>
-          <p className="text-slate-400 dark:text-gray-500 text-sm">Search for medicines and reserve from a pharmacy near you.</p>
+          <h3 className="text-lg font-bold text-slate-700 dark:text-gray-200 mb-1">{t('reservations.empty')}</h3>
+          <p className="text-slate-400 dark:text-gray-500 text-sm">{t('reservations.emptySubtitle')}</p>
         </div>
       )}
 
@@ -105,10 +170,13 @@ export default function MyReservationsPage() {
         {reservations.map((r) => {
           const cfg = STATUS_CONFIG[r.status];
           const Icon = cfg.icon;
+          const isNew = changedIds.some(c => c.id === r.id);
           return (
             <div
               key={r.id}
-              className="bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all cursor-pointer"
+              className={`bg-white dark:bg-gray-900 border rounded-2xl p-5 shadow-sm hover:shadow-md transition-all cursor-pointer ${
+                isNew ? 'border-sky-400 dark:border-sky-600 ring-2 ring-sky-200 dark:ring-sky-800' : 'border-slate-200 dark:border-gray-800'
+              }`}
               onClick={() => setSelected(r)}
             >
               <div className="flex items-start justify-between gap-4">
@@ -116,11 +184,12 @@ export default function MyReservationsPage() {
                   <div className="flex items-center gap-2 mb-1">
                     <p className="font-bold text-slate-800 dark:text-white truncate">{r.pharmacy.name}</p>
                     <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border ${cfg.bg} ${cfg.color}`}>
-                      <Icon size={11} /> {cfg.label}
+                      <Icon size={11} /> {t(cfg.labelKey)}
                     </span>
+                    {isNew && <span className="text-[10px] bg-sky-500 text-white px-1.5 py-0.5 rounded-full font-bold animate-pulse">{t('reservations.newBadge')}</span>}
                   </div>
                   <p className="text-sm text-slate-500 dark:text-gray-400 mb-2">
-                    {r.items.length} medicine{r.items.length !== 1 ? 's' : ''} · {new Date(r.createdAt).toLocaleDateString()}
+                    {r.items.length} {r.items.length !== 1 ? t('reservations.medicines_plural') : t('reservations.medicines')} · {new Date(r.createdAt).toLocaleDateString()}
                   </p>
                   <div className="flex flex-wrap gap-1.5">
                     {r.items.slice(0, 3).map((item) => (
@@ -154,7 +223,7 @@ export default function MyReservationsPage() {
             onClick={() => { const next = page + 1; setPage(next); fetchReservations(next, true); }}
             className="px-8 py-3 border border-slate-200 dark:border-gray-700 text-slate-600 dark:text-gray-300 rounded-xl font-semibold hover:bg-slate-50 dark:hover:bg-gray-800 transition-colors text-sm"
           >
-            Load More
+            {t('common.loadMore')}
           </button>
         </div>
       )}
@@ -182,20 +251,20 @@ export default function MyReservationsPage() {
                 </div>
               ))}
               <div className="border-t dark:border-gray-700 pt-2 flex justify-between font-bold">
-                <span className="text-slate-800 dark:text-white">Total</span>
+                <span className="text-slate-800 dark:text-white">{t('reservations.total')}</span>
                 <span className="text-sky-600">{Number(selected.totalAmount).toLocaleString()} RWF</span>
               </div>
             </div>
 
             {selected.status === 'REJECTED' && selected.rejectionReason && (
               <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-3 mb-4 text-sm text-red-600 dark:text-red-400">
-                <strong>Rejection reason:</strong> {selected.rejectionReason}
+                <strong>{t('reservations.rejectionReason')}</strong> {selected.rejectionReason}
               </div>
             )}
 
             {selected.pharmacy.phone && (
               <p className="text-sm text-slate-500 dark:text-gray-400 mb-4">📞 {selected.pharmacy.phone}</p>
-            )}
+            )}/0
 
             {selected.status === 'PENDING' && (
               <button
@@ -203,7 +272,7 @@ export default function MyReservationsPage() {
                 disabled={cancelling === selected.id}
                 className="w-full bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white font-semibold py-2.5 rounded-xl transition-all text-sm"
               >
-                {cancelling === selected.id ? 'Cancelling...' : 'Cancel Reservation'}
+                {cancelling === selected.id ? t('reservations.cancelling') : t('reservations.cancelBtn')}
               </button>
             )}
           </div>

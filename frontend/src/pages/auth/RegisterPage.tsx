@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Pill, User, Mail, Lock, Phone, Building2, FileText, ChevronRight, ChevronLeft, AlertCircle, CheckCircle } from 'lucide-react';
+import { Pill, User, Mail, Lock, Phone, Building2, FileText, ChevronRight, ChevronLeft, AlertCircle, CheckCircle, Eye, EyeOff } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 
 type Role = 'PATIENT' | 'PHARMACIST';
@@ -8,6 +9,7 @@ type Step = 1 | 2 | 3;
 
 export default function RegisterPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [step, setStep] = useState<Step>(1);
   const [role, setRole] = useState<Role>('PATIENT');
   const [form, setForm] = useState({
@@ -24,17 +26,20 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  // Issue #8 — show password toggle
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const update = (field: string, value: string) => setForm((f) => ({ ...f, [field]: value }));
 
   const handleSubmit = async () => {
     setError('');
     if (form.password !== form.confirmPassword) {
-      setError('Passwords do not match');
+      setError(t('auth.passwordMismatch'));
       return;
     }
     if (form.password.length < 6) {
-      setError('Password must be at least 6 characters');
+      setError(t('auth.passwordShort'));
       return;
     }
     setIsLoading(true);
@@ -54,7 +59,7 @@ export default function RegisterPage() {
       });
       setSuccess(true);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Registration failed. Please try again.');
+      setError(err.response?.data?.message || t('auth.registrationFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -99,7 +104,7 @@ export default function RegisterPage() {
               <Pill size={28} />
             </div>
             <span className="text-3xl font-bold text-white tracking-tight">
-              Pharma<span className="text-sky-400">Locate</span>
+              Imiti<span className="text-sky-400">PharmaFind</span>
             </span>
           </div>
           <p className="text-slate-400">Create your account to get started</p>
@@ -175,13 +180,49 @@ export default function RegisterPage() {
                   <label className={labelClass}><Phone size={14} className="inline mr-1" />Phone (optional)</label>
                   <input id="reg-phone" type="tel" value={form.phone} onChange={(e) => update('phone', e.target.value)} placeholder="+250 7XX XXX XXX" className={inputClass} />
                 </div>
+
+                {/* Issue #8 — Password with show/hide toggle */}
                 <div>
                   <label className={labelClass}><Lock size={14} className="inline mr-1" />Password</label>
-                  <input id="reg-password" type="password" required value={form.password} onChange={(e) => update('password', e.target.value)} placeholder="Min 6 characters" className={inputClass} />
+                  <div className="relative">
+                    <input
+                      id="reg-password"
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      value={form.password}
+                      onChange={(e) => update('password', e.target.value)}
+                      placeholder="Min 6 characters"
+                      className={`${inputClass} pr-12`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(v => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors"
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <label className={labelClass}>Confirm Password</label>
-                  <input id="reg-confirm-password" type="password" required value={form.confirmPassword} onChange={(e) => update('confirmPassword', e.target.value)} placeholder="••••••••" className={inputClass} />
+                  <div className="relative">
+                    <input
+                      id="reg-confirm-password"
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      required
+                      value={form.confirmPassword}
+                      onChange={(e) => update('confirmPassword', e.target.value)}
+                      placeholder="••••••••"
+                      className={`${inputClass} pr-12`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(v => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors"
+                    >
+                      {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
                 </div>
               </div>
               <div className="flex gap-3 mt-6">
@@ -207,7 +248,7 @@ export default function RegisterPage() {
             </div>
           )}
 
-          {/* Step 3: Pharmacy Info (pharmacist only) */}
+          {/* Step 3: Pharmacy Info */}
           {step === 3 && role === 'PHARMACIST' && (
             <div>
               <h2 className="text-xl font-bold text-white mb-2">Pharmacy Details</h2>

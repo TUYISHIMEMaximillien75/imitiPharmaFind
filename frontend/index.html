@@ -6,14 +6,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="ImitiPharmaFind — Find medicines at pharmacies near you in Musanze, Rwanda." />
     <title>ImitiPharmaFind</title>
-    <!-- Inline script to prevent flash of wrong theme before React hydrates -->
+
+    <!-- Google Fonts: Inter (primary) + Cairo (Arabic) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+    <!-- Prevent flash of wrong theme before React hydrates -->
     <script>
       (function() {
+        // Restore dark/light mode
         var stored = localStorage.getItem('imiti_theme');
         if (stored === 'light') {
           document.documentElement.classList.remove('dark');
         } else {
           document.documentElement.classList.add('dark');
+        }
+        // Restore RTL direction for Arabic
+        var lang = localStorage.getItem('ipf_lang') || '';
+        var rtl = ['ar'];
+        if (rtl.indexOf(lang) !== -1) {
+          document.documentElement.setAttribute('dir', 'rtl');
+          document.documentElement.setAttribute('lang', lang);
+        } else {
+          document.documentElement.setAttribute('dir', 'ltr');
         }
       })();
     </script>
