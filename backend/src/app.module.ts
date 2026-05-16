@@ -71,14 +71,14 @@ import { UsersModule } from './users/users.module';
               ssl: { rejectUnauthorized: false },
             }
             : {
-                // Otherwise use local DB config (your friend)
-                host: configService.get<string>('DB_HOST'),
-                port: configService.get<number>('DB_PORT') || 5432,
-                username: configService.get<string>('DB_USERNAME'),
-                password: configService.get<string>('DB_PASSWORD'),
-                database: configService.get<string>('DB_DATABASE'),
-                ssl: false,
-              }),
+              // Otherwise use local DB config
+              host: configService.get<string>('DB_HOST'),
+              port: configService.get<number>('DB_PORT') || 5432,
+              username: configService.get<string>('DB_USERNAME'),
+              password: configService.get<string>('DB_PASSWORD'),
+              database: configService.get<string>('DB_DATABASE'),
+              ssl: false,
+            }),
 
           entities: [
             User,
