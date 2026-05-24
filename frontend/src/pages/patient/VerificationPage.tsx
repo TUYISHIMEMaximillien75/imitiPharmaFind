@@ -2,12 +2,14 @@ import { useState } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { CheckCircle, Pencil, Trash2, Plus, Save, X, AlertCircle, ArrowLeft, ImageOff } from 'lucide-react';
 import api, { BASE_URL } from '../../services/api';
+import { useTranslation } from 'react-i18next';
 
 interface Medicine { id: string; name: string }
 
 export default function VerificationPage() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const state = location.state as { medicines?: Medicine[]; imageUrl?: string } | null;
 
   const [medicines, setMedicines] = useState<Medicine[]>(state?.medicines || []);
@@ -20,8 +22,8 @@ export default function VerificationPage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
         <AlertCircle size={48} className="text-amber-500" />
-        <p className="text-slate-600">No prescription data found. Please go back and upload one.</p>
-        <Link to="/" className="px-5 py-2.5 bg-sky-500 text-white rounded-xl font-semibold">Back to Search</Link>
+        <p className="text-slate-600">{t('verification.noData', 'No prescription data found. Please go back and upload one.')}</p>
+        <Link to="/" className="px-5 py-2.5 bg-sky-500 text-white rounded-xl font-semibold">{t('verification.backToSearch', 'Back to Search')}</Link>
       </div>
     );
   }
@@ -57,31 +59,31 @@ export default function VerificationPage() {
   return (
     <main className="max-w-4xl mx-auto px-4 sm:px-6 py-10 animate-in fade-in duration-500">
       <Link to="/" className="flex items-center gap-2 text-slate-500 hover:text-sky-600 mb-6 font-semibold transition-colors text-sm">
-        <ArrowLeft size={16} /> Back to Search
+        <ArrowLeft size={16} /> {t('verification.backToSearch', 'Back to Search')}
       </Link>
 
       <div className="mb-8">
-        <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Verify Extracted Medicines</h1>
-        <p className="text-slate-500 mt-2">We extracted these medicines from your prescription. Review and correct before searching.</p>
+        <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">{t('verification.title', 'Verify Extracted Medicines')}</h1>
+        <p className="text-slate-500 mt-2">{t('verification.subtitle', 'We extracted these medicines from your prescription. Review and correct before searching.')}</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Prescription preview */}
         {state?.imageUrl && (
           <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 border border-slate-200 dark:border-gray-800 shadow-sm">
-            <h2 className="font-bold text-slate-700 dark:text-gray-300 mb-4 text-sm uppercase tracking-wider">Your Prescription</h2>
+            <h2 className="font-bold text-slate-700 dark:text-gray-300 mb-4 text-sm uppercase tracking-wider">{t('verification.yourPrescription', 'Your Prescription')}</h2>
             <div className="rounded-2xl overflow-hidden border border-slate-100 dark:border-gray-700 bg-slate-50 dark:bg-gray-800 min-h-32 flex items-center justify-center">
               {imgError ? (
                 <div className="flex flex-col items-center gap-3 py-10 text-slate-400 dark:text-gray-500">
                   <ImageOff size={40} />
-                  <p className="text-sm">Could not load prescription image.</p>
+                  <p className="text-sm">{t('verification.imageError', 'Could not load prescription image.')}</p>
                   <a
                     href={state.imageUrl}
                     target="_blank"
                     rel="noreferrer"
                     className="text-xs text-sky-500 underline"
                   >
-                    Open directly
+                    {t('verification.openDirectly', 'Open directly')}
                   </a>
                 </div>
               ) : (
@@ -98,7 +100,7 @@ export default function VerificationPage() {
 
         {/* Medicine list editor */}
         <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-col">
-          <h2 className="font-bold text-slate-700 mb-4 text-sm uppercase tracking-wider">Extracted Medicines ({medicines.length})</h2>
+          <h2 className="font-bold text-slate-700 mb-4 text-sm uppercase tracking-wider">{t('verification.extractedMedicines', 'Extracted Medicines')} ({medicines.length})</h2>
 
           <div className="flex-1 space-y-2 mb-4">
             {medicines.map(med => (
@@ -112,7 +114,7 @@ export default function VerificationPage() {
                       onChange={e => setEditName(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && saveEdit()}
                       className="flex-1 bg-transparent outline-none text-slate-800 text-sm"
-                      placeholder="Medicine name..."
+                      placeholder={t('verification.medicineNamePlaceholder', 'Medicine name...')}
                     />
                     <button onClick={saveEdit} className="text-green-500 hover:text-green-700"><Save size={16} /></button>
                     <button onClick={() => setEditingId(null)} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
@@ -120,7 +122,7 @@ export default function VerificationPage() {
                 ) : (
                   <>
                     <CheckCircle size={16} className="text-sky-500 shrink-0" />
-                    <span className="flex-1 text-sm font-medium text-slate-800">{med.name || <em className="text-slate-400">Unnamed</em>}</span>
+                    <span className="flex-1 text-sm font-medium text-slate-800">{med.name || <em className="text-slate-400">{t('verification.unnamed', 'Unnamed')}</em>}</span>
                     <button onClick={() => startEdit(med)} className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-sky-500 transition-all"><Pencil size={14} /></button>
                     <button onClick={() => deleteMed(med.id)} className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-500 transition-all"><Trash2 size={14} /></button>
                   </>
@@ -130,7 +132,7 @@ export default function VerificationPage() {
 
             {medicines.length === 0 && (
               <div className="text-center py-8 text-slate-400 text-sm">
-                No medicines extracted. Add them manually below.
+                {t('verification.noExtracted', 'No medicines extracted. Add them manually below.')}
               </div>
             )}
           </div>
@@ -139,7 +141,7 @@ export default function VerificationPage() {
             onClick={addMed}
             className="flex items-center gap-2 text-sm text-sky-600 hover:text-sky-700 font-semibold mb-4 transition-colors"
           >
-            <Plus size={16} /> Add medicine manually
+            <Plus size={16} /> {t('verification.addManual', 'Add medicine manually')}
           </button>
 
           <button
@@ -149,9 +151,9 @@ export default function VerificationPage() {
             className="w-full bg-sky-500 hover:bg-sky-600 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-sky-500/20 flex items-center justify-center gap-2"
           >
             {isSaving ? (
-              <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving...</>
+              <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> {t('common.saving', 'Saving...')}</>
             ) : (
-              <><CheckCircle size={18} /> Confirm & Search Pharmacies</>
+              <><CheckCircle size={18} /> {t('verification.confirmSearch', 'Confirm & Search Pharmacies')}</>
             )}
           </button>
         </div>

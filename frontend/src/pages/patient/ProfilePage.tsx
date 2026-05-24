@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { User, Phone, Mail, Save, Loader2, CheckCircle2, Shield } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { User, Phone, Mail, Save, Loader2, CheckCircle2, Shield, HeartPulse } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -12,7 +12,11 @@ export default function ProfilePage() {
     firstName: user?.firstName || '',
     lastName: user?.lastName || '',
     phone: user?.phone || '',
+    insuranceProviderId: user?.insuranceProviderId || '',
+    insuranceNumber: user?.insuranceNumber || '',
   });
+  const [insurances, setInsurances] = useState<any[]>([]);
+  const [isVerifying, setIsVerifying] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
@@ -30,6 +34,33 @@ export default function ProfilePage() {
       setError(err.response?.data?.message || 'Failed to save changes');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    const fetchInsurances = async () => {
+      try {
+        const res = await api.get('/insurances');
+        setInsurances(res.data);
+      } catch (err) {
+        console.error('Failed to load insurances', err);
+      }
+    };
+    fetchInsurances();
+  }, []);
+
+  const handleVerify = async () => {
+    setIsVerifying(true);
+    try {
+      // First save to make sure backend has latest provider and number
+      await api.patch('/users/me', form);
+      const res = await api.post('/users/me/insurance/verify');
+      updateUser({ ...user!, ...res.data });
+      alert('Insurance Verified Successfully!');
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to verify insurance');
+    } finally {
+      setIsVerifying(false);
     }
   };
 
@@ -129,6 +160,65 @@ export default function ProfilePage() {
           )}
         </button>
       </div>
+
+      {user?.role === 'PATIENT' && (
+        <div className="bg-white dark:bg-gray-900 rounded-3xl border border-slate-200 dark:border-gray-800 shadow-sm p-6 sm:p-8 mb-6">
+          <div className="flex items-center gap-2 mb-5">
+            <HeartPulse className="text-pink-500" size={20} />
+            <h2 className="font-bold text-slate-700 dark:text-gray-300 text-sm uppercase tracking-wider">Health Insurance</h2>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+            <div>
+              <label className="text-xs font-semibold text-slate-500 mb-1.5 block">Insurance Provider</label>
+              <select
+                value={form.insuranceProviderId}
+                onChange={e => setForm({ ...form, insuranceProviderId: e.target.value })}
+                className="w-full border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300 bg-slate-50 dark:bg-gray-800 dark:text-white transition-all"
+              >
+                <option value="">Select Provider...</option>
+                {insurances.map(ins => (
+                  <option key={ins.id} value={ins.id}>{ins.providerName}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-500 mb-1.5 block">Insurance Number</label>
+              <input
+                type="text"
+                value={form.insuranceNumber}
+                onChange={e => setForm({ ...form, insuranceNumber: e.target.value })}
+                className="w-full border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-pink-300 bg-slate-50 dark:bg-gray-800 dark:text-white transition-all"
+                placeholder="e.g. 123456789"
+              />
+            </div>
+          </div>
+          
+          <div className="flex items-center justify-between mt-6">
+            <div className="flex items-center gap-2 text-sm">
+              <span className="font-semibold text-slate-600 dark:text-gray-400">Status:</span>
+              {user.isInsuranceVerified ? (
+                <span className="flex items-center gap-1 text-green-600 font-bold bg-green-50 px-2 py-1 rounded-md">
+                  <CheckCircle2 size={14} /> Verified
+                </span>
+              ) : (
+                <span className="text-amber-600 font-bold bg-amber-50 px-2 py-1 rounded-md">
+                  Unverified
+                </span>
+              )}
+            </div>
+            
+            <button
+              onClick={handleVerify}
+              disabled={isVerifying || !form.insuranceProviderId || !form.insuranceNumber}
+              className="flex items-center gap-2 bg-pink-500 hover:bg-pink-600 disabled:bg-pink-300 text-white font-semibold py-2 px-6 rounded-xl transition-all"
+            >
+              {isVerifying ? <Loader2 size={16} className="animate-spin" /> : <Shield size={16} />}
+              Verify Now
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

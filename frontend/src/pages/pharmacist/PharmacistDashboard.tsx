@@ -19,11 +19,19 @@ interface ReservationItem { id: string; quantity: number; priceAtReservation: nu
 interface Reservation {
   id: string;
   status: 'PENDING' | 'CONFIRMED' | 'REJECTED' | 'COMPLETED' | 'CANCELLED';
+  paymentMethod: string;
+  paymentStatus: string;
+  deliveryOption: string;
+  deliveryAddress?: string;
+  deliveryStatus?: string;
+  deliveryFee: number;
   totalAmount: number;
+  patientPays: number;
+  insurancePays: number;
   notes?: string;
   rejectionReason?: string;
   createdAt: string;
-  patient: { email: string; firstName?: string; lastName?: string };
+  patient: { email: string; firstName?: string; lastName?: string; isInsuranceVerified?: boolean };
   items: ReservationItem[];
 }
 interface Medicine { id: string; name: string; category: string }
@@ -504,8 +512,18 @@ export default function PharmacistDashboard() {
                           <span key={i.id} className="text-xs bg-slate-100 dark:bg-gray-800 text-slate-600 dark:text-gray-400 px-2 py-0.5 rounded-full">{i.medicine.name} ×{i.quantity}</span>
                         ))}
                       </div>
+                      <div className="flex gap-2 mt-2">
+                        {r.deliveryOption === 'HOME_DELIVERY' && <span className="text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-bold">Delivery</span>}
+                        {r.paymentMethod === 'PAY_ONLINE' && <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold">Pay Online</span>}
+                        {r.insurancePays > 0 && <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">Insured</span>}
+                      </div>
                     </div>
-                    <p className="font-bold text-slate-800 dark:text-white shrink-0">{Number(r.totalAmount).toLocaleString()} RWF</p>
+                    <div className="text-right shrink-0">
+                      <p className="font-bold text-slate-800 dark:text-white">{Number(r.totalAmount).toLocaleString()} RWF</p>
+                      {r.patientPays !== Number(r.totalAmount) && (
+                        <p className="text-xs text-sky-600 font-bold mt-1">Patient: {Number(r.patientPays).toLocaleString()}</p>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -548,9 +566,44 @@ export default function PharmacistDashboard() {
                   <span className="font-semibold">{(i.priceAtReservation * i.quantity).toLocaleString()} RWF</span>
                 </div>
               ))}
-              <div className="border-t pt-2 flex justify-between font-bold text-sm">
-                <span>Total</span>
-                <span className="text-sky-600">{Number(selectedRes.totalAmount).toLocaleString()} RWF</span>
+              <div className="border-t border-b border-slate-100 py-3 space-y-1 text-sm font-medium">
+                {selectedRes.insurancePays > 0 && (
+                  <div className="flex justify-between text-slate-500">
+                    <span>Insurance Pays</span>
+                    <span className="text-green-600">-{Number(selectedRes.insurancePays).toLocaleString()} RWF</span>
+                  </div>
+                )}
+                {selectedRes.deliveryFee > 0 && (
+                  <div className="flex justify-between text-slate-500">
+                    <span>Delivery Fee</span>
+                    <span>+{Number(selectedRes.deliveryFee).toLocaleString()} RWF</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-bold text-sm pt-1">
+                  <span>Patient Total</span>
+                  <span className="text-sky-600">{Number(selectedRes.patientPays + Number(selectedRes.deliveryFee || 0)).toLocaleString()} RWF</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 dark:bg-gray-800 rounded-xl p-4 mb-4 text-sm space-y-2">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Delivery:</span>
+                <span className="font-semibold">{selectedRes.deliveryOption === 'HOME_DELIVERY' ? 'Home Delivery' : 'Pickup'}</span>
+              </div>
+              {selectedRes.deliveryOption === 'HOME_DELIVERY' && (
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Address:</span>
+                  <span className="font-semibold text-right max-w-[200px] break-words">{selectedRes.deliveryAddress}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-slate-500">Payment:</span>
+                <span className="font-semibold">{selectedRes.paymentMethod === 'PAY_ONLINE' ? 'Online (MoMo)' : 'At Pharmacy'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Payment Status:</span>
+                <span className={`font-bold ${selectedRes.paymentStatus === 'PAID' ? 'text-green-600' : 'text-amber-600'}`}>{selectedRes.paymentStatus}</span>
               </div>
             </div>
 
@@ -591,14 +644,19 @@ export default function PharmacistDashboard() {
             )}
 
             {selectedRes.status === 'CONFIRMED' && (
-              <button
-                onClick={() => completeReservation(selectedRes.id)}
-                disabled={processingId === selectedRes.id}
-                className="w-full flex items-center justify-center gap-2 bg-sky-500 hover:bg-sky-600 disabled:bg-sky-300 text-white font-semibold py-2.5 rounded-xl text-sm transition-all"
-              >
-                <CheckCircle size={16} />
-                {processingId === selectedRes.id ? 'Processing...' : 'Mark as Completed (Picked Up)'}
-              </button>
+              <>
+                <button
+                  onClick={() => completeReservation(selectedRes.id)}
+                  disabled={processingId === selectedRes.id || (selectedRes.paymentMethod === 'PAY_ONLINE' && selectedRes.paymentStatus !== 'PAID')}
+                  className="w-full flex items-center justify-center gap-2 bg-sky-500 hover:bg-sky-600 disabled:bg-sky-300 text-white font-semibold py-2.5 rounded-xl text-sm transition-all"
+                >
+                  <CheckCircle size={16} />
+                  {processingId === selectedRes.id ? 'Processing...' : (selectedRes.deliveryOption === 'HOME_DELIVERY' ? 'Mark as Out for Delivery / Completed' : 'Mark as Completed (Picked Up)')}
+                </button>
+                {selectedRes.paymentMethod === 'PAY_ONLINE' && selectedRes.paymentStatus !== 'PAID' && (
+                  <p className="text-xs text-red-500 text-center mt-2 font-semibold">Patient has not completed online payment yet.</p>
+                )}
+              </>
             )}
 
           </div>

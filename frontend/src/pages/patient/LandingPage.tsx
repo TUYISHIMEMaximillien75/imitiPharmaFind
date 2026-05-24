@@ -22,12 +22,17 @@ export default function LandingPage() {
   const [tags, setTags] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
 
+  // Locations
+  const [locations, setLocations] = useState<any[]>([]);
+  const [selectedLocationId, setSelectedLocationId] = useState('');
+
   // Issue #10 — autocomplete
   const [allMedicines, setAllMedicines] = useState<MedicineSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
   useEffect(() => {
     api.get('/medicines').then(res => setAllMedicines(res.data)).catch(() => {});
+    api.get('/locations/hierarchy').then(res => setLocations(res.data)).catch(() => {});
   }, []);
 
   // Close dropdown on outside click
@@ -67,7 +72,7 @@ export default function LandingPage() {
   const handleSearch = () => {
     const allMeds = [...tags, ...(searchText.trim() ? [searchText.trim()] : [])];
     if (allMeds.length === 0) return;
-    navigate('/search', { state: { medicines: allMeds } });
+    navigate('/search', { state: { medicines: allMeds, locationNodeId: selectedLocationId } });
   };
 
   const handleFileSelected = async (file: File) => {
@@ -175,6 +180,21 @@ export default function LandingPage() {
                   ))}
                 </div>
               )}
+            </div>
+
+            {/* Location Selector */}
+            <div className="mt-4">
+              <label className="text-xs font-semibold text-slate-500 mb-1.5 block">Search Location (Optional)</label>
+              <select
+                value={selectedLocationId}
+                onChange={e => setSelectedLocationId(e.target.value)}
+                className="w-full border-2 border-slate-200 dark:border-gray-700 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 bg-slate-50 dark:bg-gray-800 dark:text-white transition-all"
+              >
+                <option value="">Auto-detect my location</option>
+                {locations.map(loc => (
+                  <option key={loc.id} value={loc.id}>{loc.name} ({loc.type})</option>
+                ))}
+              </select>
             </div>
 
             <div className="mt-4 flex items-center gap-3">
