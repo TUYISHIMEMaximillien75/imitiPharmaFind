@@ -7,13 +7,19 @@ export class SearchRequestDto {
   @IsString({ each: true })
   medicineNames: string[];
 
+  @IsOptional()
   @IsNumber()
   @Type(() => Number)
-  latitude: number;
+  latitude?: number;
 
+  @IsOptional()
   @IsNumber()
   @Type(() => Number)
-  longitude: number;
+  longitude?: number;
+
+  @IsOptional()
+  @IsString()
+  locationNodeId?: string;
 
   @IsOptional()
   @IsString()

@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Pharmacy } from '../pharmacies/entities/pharmacy.entity';
 import { SearchRequestDto } from './dto/search-request.dto';
+import { LocationService } from '../locations/location.service';
 
 @Injectable()
 export class SearchService {
@@ -11,19 +12,32 @@ export class SearchService {
   constructor(
     @InjectRepository(Pharmacy)
     private readonly pharmacyRepository: Repository<Pharmacy>,
+    private readonly locationService: LocationService,
   ) {}
 
   async searchPharmacies(dto: SearchRequestDto): Promise<any[]> {
-    const { medicineNames, latitude, longitude, insuranceId } = dto;
+    let { medicineNames, latitude, longitude, locationNodeId, insuranceId } = dto;
     const currentHour = new Date().getHours();
 
     this.logger.log(
-      `Searching for: [${medicineNames.join(', ')}] | insuranceId: ${insuranceId ?? 'none'} | hour: ${currentHour}`,
+      `Searching for: [${medicineNames.join(', ')}] | locationNodeId: ${locationNodeId} | insuranceId: ${insuranceId ?? 'none'}`,
     );
 
     if (!medicineNames || medicineNames.length === 0) {
       return [];
     }
+
+    if (locationNodeId) {
+      const node = await this.locationService.getNodeById(locationNodeId);
+      if (node && node.latitude && node.longitude) {
+        latitude = node.latitude;
+        longitude = node.longitude;
+      }
+    }
+    
+    // Fallback if still no lat/long
+    latitude = latitude ?? -1.5020; // Default Musanze lat
+    longitude = longitude ?? 29.6350; // Default Musanze lng
 
     const query = this.pharmacyRepository.createQueryBuilder('pharmacy')
       .leftJoin('pharmacy.pharmacyInsurances', 'pi')
@@ -93,24 +107,43 @@ export class SearchService {
             imageUrl: (inv.medicine as any)?.imageUrl ?? null,
           }));
 
-        const totalPrice = availableMeds.reduce((sum, m) => sum + Number(m.price), 0);
+        // Map pharmacyInsurances for the result
+        const insurances = (detail?.pharmacyInsurances ?? []).map((pi) => ({
+          id: pi.insurance?.id,
+          providerName: pi.insurance?.providerName,
+          coveragePercentage: Number(pi.coveragePercentage ?? pi.insurance?.defaultCoveragePercentage ?? 0),
+        }));
+
+        let matchingInsurance: any = null;
+        if (insuranceId) {
+          matchingInsurance = insurances.find(i => i.id === insuranceId) || null;
+        }
+
+        const availableMedsWithPricing = availableMeds.map((m) => {
+          let insurancePays = 0;
+          if (matchingInsurance) {
+             insurancePays = (m.price * matchingInsurance.coveragePercentage) / 100;
+          }
+          return {
+             ...m,
+             insurancePays,
+             patientPays: m.price - insurancePays,
+             coveragePercentage: matchingInsurance?.coveragePercentage ?? 0,
+          };
+        });
+
+        const totalPrice = availableMedsWithPricing.reduce((sum, m) => sum + Number(m.patientPays), 0);
+        
         const h = new Date().getHours();
         const isOpen =
           pharmacy.openingTime <= pharmacy.closingTime
             ? h >= pharmacy.openingTime && h < pharmacy.closingTime
             : h >= pharmacy.openingTime || h < pharmacy.closingTime;
 
-        // Map pharmacyInsurances for the result
-        const insurances = (detail?.pharmacyInsurances ?? []).map((pi) => ({
-          id: pi.insurance?.id,
-          providerName: pi.insurance?.providerName,
-          coveragePercentage: pi.coveragePercentage ?? pi.insurance?.defaultCoveragePercentage,
-        }));
-
         return {
           ...pharmacy,
           distance: raw[idx]?.distance ?? null,
-          availableMeds,
+          availableMeds: availableMedsWithPricing,
           totalPrice,
           isOpen,
           insurances,

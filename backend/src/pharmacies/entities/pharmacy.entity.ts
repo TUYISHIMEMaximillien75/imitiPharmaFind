@@ -58,6 +58,9 @@ export class Pharmacy {
   })
   status: PharmacyStatus;
 
+  @Column({ default: false })
+  offersDelivery: boolean;
+
   /** @deprecated use status instead */
   @Column({ default: false })
   isActive: boolean;

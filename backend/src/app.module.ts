@@ -12,6 +12,7 @@ import { Pharmacy } from './pharmacies/entities/pharmacy.entity';
 import { Insurance } from './insurances/entities/insurance.entity';
 import { InsurancesModule } from './insurances/insurances.module';
 import { LocationsModule } from './locations/locations.module';
+import { LocationNode } from './locations/entities/location-node.entity';
 import { Prescription } from './prescriptions/entities/prescription.entity';
 import { PrescriptionsModule } from './prescriptions/prescriptions.module';
 import { Medicine } from './medicines/entities/medicine.entity';
@@ -91,6 +92,7 @@ import { PharmacyInsurance } from './pharmacies/entities/pharmacy-insurance.enti
             InventoryItem,
             Reservation,
             ReservationItem,
+            LocationNode,
           ],
           synchronize: true, // Dev only
         };
