@@ -14,6 +14,23 @@ export enum ReservationStatus {
   CANCELLED = 'CANCELLED',
 }
 
+export enum PaymentMethod {
+  PAY_AT_PHARMACY = 'PAY_AT_PHARMACY',
+  PAY_ONLINE = 'PAY_ONLINE',
+}
+
+export enum DeliveryOption {
+  PICKUP = 'PICKUP',
+  HOME_DELIVERY = 'HOME_DELIVERY',
+}
+
+export enum DeliveryStatus {
+  PENDING = 'PENDING',
+  ASSIGNED = 'ASSIGNED',
+  PICKED_UP = 'PICKED_UP',
+  DELIVERED = 'DELIVERED',
+}
+
 export enum PaymentStatus {
   UNPAID = 'UNPAID',
   PAID = 'PAID',
@@ -61,6 +78,39 @@ export class Reservation {
 
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
   totalAmount: number;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  patientPays: number;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  insurancePays: number;
+
+  @Column({
+    type: 'enum',
+    enum: PaymentMethod,
+    default: PaymentMethod.PAY_AT_PHARMACY,
+  })
+  paymentMethod: PaymentMethod;
+
+  @Column({
+    type: 'enum',
+    enum: DeliveryOption,
+    default: DeliveryOption.PICKUP,
+  })
+  deliveryOption: DeliveryOption;
+
+  @Column({ nullable: true })
+  deliveryAddress: string;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  deliveryFee: number;
+
+  @Column({
+    type: 'enum',
+    enum: DeliveryStatus,
+    nullable: true,
+  })
+  deliveryStatus: DeliveryStatus;
 
   @Column({ nullable: true, type: 'text' })
   rejectionReason: string;

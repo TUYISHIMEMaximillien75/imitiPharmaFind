@@ -18,7 +18,7 @@ interface PharmacyResult {
   phone?: string;
   openingTime: number;
   closingTime: number;
-  availableMeds: { medicineId: string; name: string; price: number; stock: number; imageUrl?: string }[];
+  availableMeds: { medicineId: string; name: string; price: number; stock: number; imageUrl?: string; patientPays?: number; insurancePays?: number; coveragePercentage?: number }[];
   totalPrice: number;
   isOpen: boolean;
   insurances?: { id: string; providerName: string; coveragePercentage: number }[];
@@ -42,7 +42,7 @@ export default function SearchResultsPage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const { t } = useTranslation();
-  const state = location.state as { medicines?: string[] } | null;
+  const state = location.state as { medicines?: string[]; locationNodeId?: string } | null;
 
   const [results, setResults] = useState<PharmacyResult[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -59,12 +59,16 @@ export default function SearchResultsPage() {
   const [reservationNote, setReservationNote] = useState('');
   const [isReserving, setIsReserving] = useState(false);
   const [reservationSuccess, setReservationSuccess] = useState(false);
+  const [deliveryOption, setDeliveryOption] = useState<'PICKUP' | 'HOME_DELIVERY'>('PICKUP');
+  const [paymentMethod, setPaymentMethod] = useState<'PAY_AT_PHARMACY' | 'PAY_ONLINE'>('PAY_AT_PHARMACY');
+  const [deliveryAddress, setDeliveryAddress] = useState('');
 
   // Map state
   const [showMap, setShowMap] = useState(false);
   const [userCoords, setUserCoords] = useState({ lat: -1.5, lng: 29.6 });
 
   const medicines = state?.medicines || [];
+  const initialLocationNodeId = state?.locationNodeId || '';
 
   useEffect(() => {
     // Load insurance providers for the filter
@@ -92,6 +96,7 @@ export default function SearchResultsPage() {
         medicineNames: medicines,
         latitude,
         longitude,
+        locationNodeId: initialLocationNodeId || undefined,
         ...(selectedInsuranceId ? { insuranceId: selectedInsuranceId } : {}),
       });
       setResults(res.data);
@@ -108,9 +113,19 @@ export default function SearchResultsPage() {
   const openReservationModal = (pharmacy: PharmacyResult) => {
     if (!isAuthenticated) { navigate('/login', { state: { from: location } }); return; }
     setReservingPharmacy(pharmacy);
-    setReservationItems(pharmacy.availableMeds.map(m => ({ medicineId: m.medicineId, name: m.name, price: m.price, quantity: 1 })));
+    
+    // Use the prices calculated from search (which includes insurance splits)
+    setReservationItems(pharmacy.availableMeds.map(m => ({ 
+      medicineId: m.medicineId, 
+      name: m.name, 
+      price: m.patientPays ?? m.price, // use patient pays if available
+      quantity: 1 
+    })));
     setReservationNote('');
     setReservationSuccess(false);
+    setDeliveryOption('PICKUP');
+    setPaymentMethod('PAY_AT_PHARMACY');
+    setDeliveryAddress('');
   };
 
   const sendReservation = async () => {
@@ -121,6 +136,10 @@ export default function SearchResultsPage() {
         pharmacyId: reservingPharmacy.id,
         items: reservationItems.map(i => ({ medicineId: i.medicineId, quantity: i.quantity })),
         notes: reservationNote,
+        paymentMethod,
+        deliveryOption,
+        deliveryAddress,
+        deliveryDistanceKm: reservingPharmacy.distance,
       });
       setReservationSuccess(true);
     } catch (err: any) {
@@ -311,23 +330,36 @@ export default function SearchResultsPage() {
 
               {/* Medicine list */}
               {pharmacy.availableMeds && pharmacy.availableMeds.length > 0 && (
-                <div className="flex flex-wrap gap-2 mb-5">
+                <div className="flex flex-col gap-2 mb-5">
                   {pharmacy.availableMeds.map((m, i) => (
-                    <div key={i} className="flex items-center gap-2 bg-green-50 border border-green-100 text-green-700 rounded-xl px-3 py-1.5 text-sm font-medium">
-                      {m.imageUrl && (
-                        <img
-                          src={m.imageUrl}
-                          alt={m.name}
-                          className="w-7 h-7 rounded-lg object-cover shrink-0 border border-green-200"
-                          onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                        />
-                      )}
-                      <CheckCircle2 size={13} />
-                      {m.name}
-                      <span className="text-green-500 font-bold">{Number(m.price).toLocaleString()} RWF</span>
-                      {m.stock <= 10 && m.stock > 0 && (
-                        <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{m.stock} left</span>
-                      )}
+                    <div key={i} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-slate-50 dark:bg-gray-800 border border-slate-100 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-medium">
+                      <div className="flex items-center gap-3">
+                        {m.imageUrl && (
+                          <img
+                            src={m.imageUrl}
+                            alt={m.name}
+                            className="w-8 h-8 rounded-lg object-cover shrink-0 border border-slate-200"
+                            onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                          />
+                        )}
+                        <CheckCircle2 size={16} className="text-green-500" />
+                        <span className="text-slate-700 dark:text-gray-200">{m.name}</span>
+                        {m.stock <= 10 && m.stock > 0 && (
+                          <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{m.stock} left</span>
+                        )}
+                      </div>
+                      
+                      <div className="flex flex-col items-end gap-0.5">
+                        <span className="text-xs text-slate-400 line-through">Orig: {Number(m.price).toLocaleString()} RWF</span>
+                        {m.coveragePercentage ? (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-green-600 bg-green-50 px-1.5 rounded">Ins: -{Number(m.insurancePays).toLocaleString()} ({m.coveragePercentage}%)</span>
+                            <span className="text-sky-600 font-bold">{Number(m.patientPays).toLocaleString()} RWF</span>
+                          </div>
+                        ) : (
+                          <span className="text-slate-700 dark:text-gray-200 font-bold">{Number(m.price).toLocaleString()} RWF</span>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -387,13 +419,63 @@ export default function SearchResultsPage() {
                   </button>
                 </div>
 
-                <div className="space-y-2 mb-4">
+                <div className="space-y-2 mb-4 max-h-32 overflow-y-auto">
                   {reservationItems.map((item, i) => (
                     <div key={i} className="flex items-center justify-between bg-slate-50 dark:bg-gray-800 rounded-xl px-4 py-3">
                       <span className="text-sm font-medium text-slate-700 dark:text-gray-300">{item.name}</span>
                       <span className="text-sm font-bold text-sky-600">{Number(item.price).toLocaleString()} RWF</span>
                     </div>
                   ))}
+                </div>
+
+                {/* Delivery Option */}
+                <div className="mb-4">
+                  <label className="text-xs font-semibold text-slate-500 mb-1.5 block">Delivery Option</label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setDeliveryOption('PICKUP')}
+                      className={`flex-1 py-2 rounded-xl text-sm font-semibold border transition-all ${
+                        deliveryOption === 'PICKUP' ? 'bg-sky-500 text-white border-sky-500' : 'bg-white text-slate-600 border-slate-200'
+                      }`}
+                    >
+                      Pickup
+                    </button>
+                    <button
+                      onClick={() => setDeliveryOption('HOME_DELIVERY')}
+                      className={`flex-1 py-2 rounded-xl text-sm font-semibold border transition-all ${
+                        deliveryOption === 'HOME_DELIVERY' ? 'bg-sky-500 text-white border-sky-500' : 'bg-white text-slate-600 border-slate-200'
+                      }`}
+                    >
+                      Home Delivery
+                    </button>
+                  </div>
+                </div>
+
+                {deliveryOption === 'HOME_DELIVERY' && (
+                  <div className="mb-4">
+                    <label className="text-xs font-semibold text-slate-500 mb-1.5 block">Delivery Address / Sector</label>
+                    <input
+                      type="text"
+                      value={deliveryAddress}
+                      onChange={e => setDeliveryAddress(e.target.value)}
+                      placeholder="e.g. Muhoza, close to market"
+                      className="w-full border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 bg-slate-50 dark:bg-gray-800 dark:text-white"
+                    />
+                    <p className="text-xs text-amber-600 mt-1">Est. Delivery Fee: {reservingPharmacy.distance <= 2 ? '500' : reservingPharmacy.distance <= 5 ? '1000' : '1500'} RWF</p>
+                  </div>
+                )}
+
+                {/* Payment Method */}
+                <div className="mb-4">
+                  <label className="text-xs font-semibold text-slate-500 mb-1.5 block">Payment Method</label>
+                  <select
+                    value={paymentMethod}
+                    onChange={e => setPaymentMethod(e.target.value as any)}
+                    className="w-full border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 bg-slate-50 dark:bg-gray-800 dark:text-white"
+                  >
+                    <option value="PAY_AT_PHARMACY">Pay at Pharmacy</option>
+                    <option value="PAY_ONLINE">Pay Online (MoMo)</option>
+                  </select>
                 </div>
 
                 <textarea
@@ -404,9 +486,15 @@ export default function SearchResultsPage() {
                   className="w-full border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 resize-none mb-4 bg-slate-50 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500"
                 />
 
+                {selectedInsuranceId && !useAuth().user?.isInsuranceVerified && (
+                  <div className="bg-red-50 text-red-600 p-3 rounded-xl text-xs font-semibold mb-4">
+                    Your insurance is not verified. Please go to your profile to verify your insurance before making an insured reservation.
+                  </div>
+                )}
+
                 <button
                   onClick={sendReservation}
-                  disabled={isReserving}
+                  disabled={isReserving || (selectedInsuranceId !== '' && !useAuth().user?.isInsuranceVerified)}
                   className="w-full bg-sky-500 hover:bg-sky-600 disabled:bg-sky-300 text-white font-bold py-3 rounded-2xl transition-all"
                 >
                   {isReserving ? 'Sending...' : 'Send Reservation Request'}

@@ -83,4 +83,11 @@ export class ReservationsController {
   cancel(@Param('id') id: string, @Request() req: any) {
     return this.reservationsService.cancel(id, req.user.id);
   }
+
+  /** Patient: simulate online payment */
+  @Post(':id/pay-online')
+  @Roles(UserRole.PATIENT)
+  payOnline(@Param('id') id: string, @Request() req: any) {
+    return this.reservationsService.payOnline(id, req.user.id);
+  }
 }

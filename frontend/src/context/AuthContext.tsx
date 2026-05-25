@@ -15,6 +15,9 @@ export interface AuthUser {
     status: 'PENDING' | 'ACTIVE' | 'REJECTED' | 'SUSPENDED';
     isActive: boolean;
   } | null;
+  insuranceProviderId?: string;
+  insuranceNumber?: string;
+  isInsuranceVerified?: boolean;
 }
 
 interface AuthContextType {

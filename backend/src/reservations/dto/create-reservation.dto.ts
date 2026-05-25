@@ -3,6 +3,7 @@ import {
   ArrayMinSize, ValidateNested, IsInt, Min,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { PaymentMethod, DeliveryOption } from '../entities/reservation.entity';
 
 export class ReservationItemDto {
   @IsUUID('4', { message: 'medicineId must be a valid UUID' })
@@ -30,4 +31,21 @@ export class CreateReservationDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsString()
+  paymentMethod?: PaymentMethod;
+
+  @IsOptional()
+  @IsString()
+  deliveryOption?: DeliveryOption;
+
+  @IsOptional()
+  @IsString()
+  deliveryAddress?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  deliveryDistanceKm?: number;
 }

@@ -9,8 +9,9 @@ import { PharmacyInsurance } from './pharmacies/entities/pharmacy-insurance.enti
 import { Insurance } from './insurances/entities/insurance.entity';
 import { Medicine, MedicineCategory } from './medicines/entities/medicine.entity';
 import { InventoryItem } from './inventory/entities/inventory-item.entity';
-import { Reservation, ReservationStatus, PaymentStatus } from './reservations/entities/reservation.entity';
+import { Reservation, ReservationStatus, PaymentStatus, PaymentMethod, DeliveryOption, DeliveryStatus } from './reservations/entities/reservation.entity';
 import { ReservationItem } from './reservations/entities/reservation-item.entity';
+import { LocationNode, LocationType } from './locations/entities/location-node.entity';
 
 async function bootstrap() {
   const app = await NestFactory.createApplicationContext(AppModule);
@@ -25,6 +26,7 @@ async function bootstrap() {
   await dataSource.query(`TRUNCATE TABLE "pharmacies" CASCADE`);
   await dataSource.query(`TRUNCATE TABLE "insurances" CASCADE`);
   await dataSource.query(`TRUNCATE TABLE "users" CASCADE`);
+  await dataSource.query(`TRUNCATE TABLE "location_nodes" CASCADE`);
 
   console.log('Database cleared. Seeding initial data...');
 
@@ -41,6 +43,19 @@ async function bootstrap() {
   ]);
   console.log(`Seeded ${insurances.length} insurances.`);
 
+  // 1b. Seed Location Nodes (Hierarchy)
+  const locRepo = dataSource.getRepository(LocationNode);
+  const provNorth = await locRepo.save({ name: 'Northern Province', type: LocationType.PROVINCE });
+  const distMusanze = await locRepo.save({ name: 'Musanze', type: LocationType.DISTRICT, parent: provNorth });
+  
+  const secMuhoza = await locRepo.save({ name: 'Muhoza', type: LocationType.SECTOR, parent: distMusanze, latitude: -1.5020, longitude: 29.6350 });
+  const secKinigi = await locRepo.save({ name: 'Kinigi', type: LocationType.SECTOR, parent: distMusanze, latitude: -1.4350, longitude: 29.5850 });
+  
+  await locRepo.save({ name: 'Mpenge', type: LocationType.CELL, parent: secMuhoza, latitude: -1.5020, longitude: 29.6350 });
+  await locRepo.save({ name: 'Ruhengeri', type: LocationType.CELL, parent: secMuhoza, latitude: -1.4985, longitude: 29.6380 });
+  await locRepo.save({ name: 'Bisate', type: LocationType.CELL, parent: secKinigi, latitude: -1.4350, longitude: 29.5850 });
+  console.log(`Seeded location nodes.`);
+
   // 2. Seed Users
   const userRepo = dataSource.getRepository(User);
   const usersToCreate = [
@@ -48,8 +63,8 @@ async function bootstrap() {
     { email: 'pharmacist.volcans@belyse.com', passwordHash, firstName: 'Jean', lastName: 'Damascene', role: UserRole.PHARMACIST, phone: '0780000001' },
     { email: 'pharmacist.muhoza@belyse.com', passwordHash, firstName: 'Marie', lastName: 'Claire', role: UserRole.PHARMACIST, phone: '0780000002' },
     { email: 'pharmacist.kinigi@belyse.com', passwordHash, firstName: 'Eric', lastName: 'Manzi', role: UserRole.PHARMACIST, phone: '0780000003' },
-    { email: 'patient1@belyse.com', passwordHash, firstName: 'Alice', lastName: 'Uwase', role: UserRole.PATIENT, phone: '0780000004' },
-    { email: 'patient2@belyse.com', passwordHash, firstName: 'Bob', lastName: 'Ntwari', role: UserRole.PATIENT, phone: '0780000005' },
+    { email: 'patient1@belyse.com', passwordHash, firstName: 'Alice', lastName: 'Uwase', role: UserRole.PATIENT, phone: '0780000004', insuranceProvider: insurances[0], insuranceNumber: 'RAMA-12345', isInsuranceVerified: true },
+    { email: 'patient2@belyse.com', passwordHash, firstName: 'Bob', lastName: 'Ntwari', role: UserRole.PATIENT, phone: '0780000005', insuranceProvider: insurances[2], insuranceNumber: 'CBHI-98765', isInsuranceVerified: true },
     { email: 'tuyishimemaximillien@gmail.com', passwordHash, firstName: 'Maximillien', lastName: 'TUYISHIME', role: UserRole.PATIENT, phone: '0784321588' },
     { email: 'patient3@belyse.com', passwordHash, firstName: 'Chantal', lastName: 'Mugisha', role: UserRole.PATIENT, phone: '0780000006' },
   ];
@@ -83,6 +98,7 @@ async function bootstrap() {
       status: PharmacyStatus.ACTIVE,
       isActive: true,
       owner: pharmacists[0],
+      offersDelivery: true,
     },
     {
       name: 'Pharmacie Muhoza',
@@ -96,6 +112,7 @@ async function bootstrap() {
       status: PharmacyStatus.ACTIVE,
       isActive: true,
       owner: pharmacists[1],
+      offersDelivery: true,
     },
     {
       name: 'Kinigi Health Pharmacy',
@@ -109,6 +126,7 @@ async function bootstrap() {
       status: PharmacyStatus.ACTIVE,
       isActive: true,
       owner: pharmacists[2],
+      offersDelivery: false,
     },
   ];
 
@@ -261,14 +279,31 @@ async function bootstrap() {
 
     const statuses = [ReservationStatus.PENDING, ReservationStatus.CONFIRMED, ReservationStatus.COMPLETED];
     const status = statuses[Math.floor(Math.random() * statuses.length)];
+    
+    // Check if patient has verified insurance (seeded above)
+    let insurancePays = 0;
+    if (patient.isInsuranceVerified && patient.insuranceProvider) {
+      // Very crude simulation: assume flat 85% coverage for mock data
+      insurancePays = totalAmount * 0.85;
+    }
+    const patientPays = totalAmount - insurancePays;
+
+    const isDelivery = Math.random() > 0.5 && pharmacy.offersDelivery;
 
     reservationsToCreate.push({
       patient,
       pharmacy,
       items,
       status,
+      paymentMethod: Math.random() > 0.5 ? PaymentMethod.PAY_ONLINE : PaymentMethod.PAY_AT_PHARMACY,
       paymentStatus: status === ReservationStatus.COMPLETED ? PaymentStatus.PAID : PaymentStatus.UNPAID,
+      deliveryOption: isDelivery ? DeliveryOption.HOME_DELIVERY : DeliveryOption.PICKUP,
+      deliveryFee: isDelivery ? 1000 : 0,
+      deliveryAddress: isDelivery ? 'Musanze, Sector Muhoza, 123' : undefined,
+      deliveryStatus: isDelivery && status === ReservationStatus.CONFIRMED ? DeliveryStatus.PENDING : undefined,
       totalAmount,
+      patientPays,
+      insurancePays,
       notes: `Sample reservation ${i + 1}`,
     });
   }

@@ -1,7 +1,33 @@
 import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { LocationNode, LocationType } from './entities/location-node.entity';
 
 @Injectable()
 export class LocationService {
+  constructor(
+    @InjectRepository(LocationNode)
+    private readonly locationNodeRepo: Repository<LocationNode>,
+  ) {}
+
+  async getNodes(parentId?: string): Promise<LocationNode[]> {
+    if (parentId) {
+      return this.locationNodeRepo.find({
+        where: { parent: { id: parentId } },
+        order: { name: 'ASC' },
+      });
+    }
+    // If no parentId, return the top level (PROVINCE or DISTRICT, depending on what we seed as root)
+    return this.locationNodeRepo.find({
+      where: { type: LocationType.PROVINCE }, // Assuming PROVINCE is the root
+      order: { name: 'ASC' },
+    });
+  }
+
+  async getNodeById(id: string): Promise<LocationNode | null> {
+    return this.locationNodeRepo.findOne({ where: { id } });
+  }
+
   /**
    * Calculates the distance between two geographical points using the Haversine formula.
    * @param lat1 Latitude of point 1 in decimal degrees

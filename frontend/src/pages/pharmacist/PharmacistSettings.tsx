@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import {
-  Settings, Clock, Shield, User, Save, Plus, Trash2, Pencil,
+  Clock, Shield, User, Save, Plus, Trash2, Pencil,
   CheckCircle, X, AlertCircle, ChevronLeft, ChevronRight, Package,
 } from 'lucide-react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { useTranslation } from 'react-i18next';
 
 interface Insurance {
   id: string;
@@ -31,7 +32,8 @@ type SettingsTab = 'profile' | 'hours' | 'insurance';
 const PAGE_SIZE = 8;
 
 export default function PharmacistSettings() {
-  const { user, updateUser } = useAuth();
+  const { user } = useAuth();
+  const { t } = useTranslation();
   const [tab, setTab] = useState<SettingsTab>('profile');
 
   // Pharmacy state
@@ -100,9 +102,9 @@ export default function PharmacistSettings() {
     setSaving(true); setSaveMsg(''); setSaveError('');
     try {
       await api.patch(`/pharmacies/${pharmacyId}`, profile);
-      setSaveMsg('Profile updated!');
+      setSaveMsg(t('settings.profileUpdated', 'Profile updated!'));
       setTimeout(() => setSaveMsg(''), 3000);
-    } catch { setSaveError('Failed to save profile.'); }
+    } catch { setSaveError(t('settings.saveFailed', 'Failed to save.')); }
     finally { setSaving(false); }
   };
 
@@ -111,9 +113,9 @@ export default function PharmacistSettings() {
     setSaving(true); setSaveMsg(''); setSaveError('');
     try {
       await api.patch(`/pharmacies/${pharmacyId}`, hours);
-      setSaveMsg('Hours updated!');
+      setSaveMsg(t('settings.hoursUpdated', 'Hours updated!'));
       setTimeout(() => setSaveMsg(''), 3000);
-    } catch { setSaveError('Failed to save hours.'); }
+    } catch { setSaveError(t('settings.saveFailed', 'Failed to save.')); }
     finally { setSaving(false); }
   };
 
@@ -132,14 +134,14 @@ export default function PharmacistSettings() {
 
   const updateInsurance = async (insuranceId: string) => {
     try {
-      const res = await api.patch(`/pharmacies/${pharmacyId}/insurances/${insuranceId}`, { coveragePercentage: editCoverage });
+      await api.patch(`/pharmacies/${pharmacyId}/insurances/${insuranceId}`, { coveragePercentage: editCoverage });
       setPharmacyInsurances(prev => prev.map(pi => pi.insuranceId === insuranceId ? { ...pi, coveragePercentage: editCoverage } : pi));
       setEditingInsId(null);
     } catch { alert('Failed to update coverage'); }
   };
 
   const removeInsurance = async (insuranceId: string) => {
-    if (!confirm('Remove this insurance from your pharmacy?')) return;
+    if (!confirm(t('settings.removeInsuranceConfirm', 'Remove this insurance from your pharmacy?'))) return;
     try {
       await api.delete(`/pharmacies/${pharmacyId}/insurances/${insuranceId}`);
       setPharmacyInsurances(prev => prev.filter(pi => pi.insuranceId !== insuranceId));
@@ -173,7 +175,7 @@ export default function PharmacistSettings() {
   );
 
   if (!pharmacy) return (
-    <div className="text-center py-16 text-slate-400">No pharmacy found for your account.</div>
+    <div className="text-center py-16 text-slate-400">{t('common.noResults', 'No pharmacy found for your account.')}</div>
   );
 
   /* ── Insurance detail modal ── */
@@ -200,12 +202,12 @@ export default function PharmacistSettings() {
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-slate-200 dark:border-gray-800 p-6">
           <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
             <h3 className="font-bold text-slate-700 dark:text-gray-200 text-sm uppercase tracking-wider flex items-center gap-2">
-              <Package size={15} className="text-sky-500" /> Medicines in your inventory
+              <Package size={15} className="text-sky-500" /> {t('settings.inventoryTitle', 'Medicines in your inventory')}
             </h3>
             <input
               value={invSearch}
               onChange={e => { setInvSearch(e.target.value); setInvPage(1); }}
-              placeholder="Search medicines..."
+              placeholder={t('pharmacy.searchMedicines', 'Search medicines...')}
               className="border border-slate-200 dark:border-gray-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 bg-slate-50 dark:bg-gray-800 dark:text-white w-44"
             />
           </div>
@@ -222,12 +224,12 @@ export default function PharmacistSettings() {
                   <div className="text-right shrink-0">
                     <p className="text-xs line-through text-slate-400">{Number(inv.price).toLocaleString()} RWF</p>
                     <p className="text-sm font-bold text-green-600 dark:text-green-400">{insuredPrice.toLocaleString()} RWF</p>
-                    <p className="text-[10px] text-slate-400 dark:text-gray-500">{pct}% covered</p>
+                    <p className="text-[10px] text-slate-400 dark:text-gray-500">{pct}% {t('settings.covered', 'covered')}</p>
                   </div>
                 </div>
               );
             })}
-            {filteredInv.length === 0 && <p className="text-center text-slate-400 py-8 text-sm">No medicines found.</p>}
+            {filteredInv.length === 0 && <p className="text-center text-slate-400 py-8 text-sm">{t('pharmacy.noMedicinesFound', 'No medicines found.')}</p>}
           </div>
 
           {/* Pagination */}
@@ -254,9 +256,9 @@ export default function PharmacistSettings() {
       {/* Tabs */}
       <div className="flex bg-slate-100 dark:bg-gray-800 p-1 rounded-xl border border-slate-200 dark:border-gray-700 mb-6 w-fit">
         {([
-          { key: 'profile', label: 'Profile', icon: User },
-          { key: 'hours', label: 'Hours', icon: Clock },
-          { key: 'insurance', label: 'Insurance', icon: Shield },
+          { key: 'profile', label: t('settings.profile', 'Profile'), icon: User },
+          { key: 'hours', label: t('settings.hours', 'Hours'), icon: Clock },
+          { key: 'insurance', label: t('settings.insurance', 'Insurance'), icon: Shield },
         ] as { key: SettingsTab; label: string; icon: any }[]).map(({ key, label, icon: Icon }) => (
           <button key={key} onClick={() => { setTab(key); setSaveMsg(''); setSaveError(''); }}
             className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${
@@ -273,84 +275,90 @@ export default function PharmacistSettings() {
 
       {/* ── Profile Tab ── */}
       {tab === 'profile' && (
-        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-slate-200 dark:border-gray-800 shadow-sm p-6">
-          <h2 className="font-bold text-slate-800 dark:text-white mb-5 flex items-center gap-2"><User size={18} className="text-sky-500" /> Pharmacy Profile</h2>
-          <div className="space-y-4">
-            <div>
-              <label className="text-xs font-semibold text-slate-600 dark:text-gray-400 mb-1 block">Pharmacy Name</label>
-              <input value={profile.name} onChange={e => setProfile(p => ({ ...p, name: e.target.value }))} className={inputCls} />
+        <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-6">{t('settings.profile', 'Pharmacy Profile')}</h2>
+            <div className="space-y-4 max-w-xl">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 dark:text-gray-300 mb-1">{t('settings.pharmacyName', 'Pharmacy Name')}</label>
+                <input value={profile.name} onChange={e => setProfile({ ...profile, name: e.target.value })} className={inputCls} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-gray-300 mb-1">{t('settings.phone', 'Phone Number')}</label>
+                  <input value={profile.phone} onChange={e => setProfile({ ...profile, phone: e.target.value })} className={inputCls} />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 dark:text-gray-300 mb-1">{t('settings.address', 'Address')}</label>
+                <input value={profile.address} onChange={e => setProfile({ ...profile, address: e.target.value })} className={inputCls} />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 dark:text-gray-300 mb-1">{t('settings.description', 'Description')}</label>
+                <textarea value={profile.description} onChange={e => setProfile({ ...profile, description: e.target.value })} className={inputCls} rows={3} />
+              </div>
+
+              <button onClick={saveProfile} disabled={saving} className="px-6 py-2.5 bg-sky-500 hover:bg-sky-600 disabled:bg-sky-300 text-white font-semibold rounded-xl transition-all shadow-md shadow-sky-500/20 flex items-center gap-2 mt-4">
+                <Save size={18} /> {saving ? t('common.saving', 'Saving...') : t('settings.saveProfile', 'Save Profile')}
+              </button>
             </div>
-            <div>
-              <label className="text-xs font-semibold text-slate-600 dark:text-gray-400 mb-1 block">Phone</label>
-              <input value={profile.phone} onChange={e => setProfile(p => ({ ...p, phone: e.target.value }))} className={inputCls} placeholder="+250 7XX XXX XXX" />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-slate-600 dark:text-gray-400 mb-1 block">Address</label>
-              <input value={profile.address} onChange={e => setProfile(p => ({ ...p, address: e.target.value }))} className={inputCls} />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-slate-600 dark:text-gray-400 mb-1 block">Description</label>
-              <textarea value={profile.description} onChange={e => setProfile(p => ({ ...p, description: e.target.value }))} rows={3} className={`${inputCls} resize-none`} />
-            </div>
-          </div>
-          <button onClick={saveProfile} disabled={saving} className="mt-5 flex items-center gap-2 px-6 py-2.5 bg-sky-500 hover:bg-sky-600 disabled:bg-sky-300 text-white rounded-xl text-sm font-semibold transition-colors">
-            <Save size={15} /> {saving ? 'Saving...' : 'Save Profile'}
-          </button>
         </div>
       )}
 
       {/* ── Hours Tab ── */}
       {tab === 'hours' && (
-        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-slate-200 dark:border-gray-800 shadow-sm p-6">
-          <h2 className="font-bold text-slate-800 dark:text-white mb-5 flex items-center gap-2"><Clock size={18} className="text-sky-500" /> Operating Hours</h2>
-          <div className="grid grid-cols-2 gap-6">
-            {(['openingTime', 'closingTime'] as const).map(field => (
-              <div key={field}>
-                <label className="text-xs font-semibold text-slate-600 dark:text-gray-400 mb-1 block">{field === 'openingTime' ? 'Opens at' : 'Closes at'}</label>
-                <select
-                  value={hours[field]}
-                  onChange={e => setHours(h => ({ ...h, [field]: +e.target.value }))}
-                  className={inputCls}
-                >
-                  {Array.from({ length: 24 }, (_, i) => (
-                    <option key={i} value={i}>
-                      {i === 0 ? '12:00 AM' : i < 12 ? `${i}:00 AM` : i === 12 ? '12:00 PM' : `${i - 12}:00 PM`}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ))}
-          </div>
-          <div className="mt-4 bg-slate-50 dark:bg-gray-800 rounded-xl p-3 text-sm text-slate-600 dark:text-gray-400">
-            Your pharmacy will appear as <strong>Open</strong> between{' '}
-            <strong>{hours.openingTime}:00</strong> and <strong>{hours.closingTime}:00</strong>.
-          </div>
-          <button onClick={saveHours} disabled={saving} className="mt-5 flex items-center gap-2 px-6 py-2.5 bg-sky-500 hover:bg-sky-600 disabled:bg-sky-300 text-white rounded-xl text-sm font-semibold transition-colors">
-            <Save size={15} /> {saving ? 'Saving...' : 'Save Hours'}
-          </button>
+        <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
+              <Clock className="text-sky-500" /> {t('settings.operatingHours', 'Operating Hours')}
+            </h2>
+            <div className="grid grid-cols-2 gap-6 max-w-md">
+              {(['openingTime', 'closingTime'] as const).map(field => (
+                <div key={field}>
+                  <label className="text-xs font-semibold text-slate-600 dark:text-gray-400 mb-1 block">
+                    {field === 'openingTime' ? t('settings.opensAt', 'Opens at') : t('settings.closesAt', 'Closes at')}
+                  </label>
+                  <select
+                    value={hours[field]}
+                    onChange={e => setHours(h => ({ ...h, [field]: +e.target.value }))}
+                    className={inputCls}
+                  >
+                    {Array.from({ length: 24 }, (_, i) => (
+                      <option key={i} value={i}>
+                        {i === 0 ? '12:00 AM' : i < 12 ? `${i}:00 AM` : i === 12 ? '12:00 PM' : `${i - 12}:00 PM`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+            </div>
+            <p className="text-sm text-slate-500 dark:text-gray-400 mt-4">
+              {t('settings.hoursNote', 'Your pharmacy will appear as Open between {{open}}:00 and {{close}}:00.', { open: hours.openingTime, close: hours.closingTime })}
+            </p>
+
+            <button onClick={saveHours} disabled={saving} className="px-6 py-2.5 bg-sky-500 hover:bg-sky-600 disabled:bg-sky-300 text-white font-semibold rounded-xl transition-all shadow-md shadow-sky-500/20 flex items-center gap-2 mt-6">
+              <Save size={18} /> {saving ? t('common.saving', 'Saving...') : t('settings.saveHours', 'Save Hours')}
+            </button>
         </div>
       )}
 
       {/* ── Insurance Tab ── */}
       {tab === 'insurance' && (
-        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-slate-200 dark:border-gray-800 shadow-sm p-6">
-          <div className="flex items-center justify-between mb-5">
-            <h2 className="font-bold text-slate-800 dark:text-white flex items-center gap-2"><Shield size={18} className="text-sky-500" /> Accepted Insurances</h2>
-            <button onClick={() => setAddingIns(v => !v)} className="flex items-center gap-1.5 px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-xl text-sm font-semibold transition-colors">
-              <Plus size={15} /> Add Insurance
-            </button>
-          </div>
+        <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                <Shield className="text-emerald-500" /> {t('settings.acceptedInsurances', 'Accepted Insurances')}
+              </h2>
+              <button onClick={() => setAddingIns(true)} className="flex items-center gap-2 text-sm font-semibold text-sky-600 hover:text-sky-700 bg-sky-50 hover:bg-sky-100 dark:bg-sky-900/20 dark:hover:bg-sky-900/40 px-4 py-2 rounded-xl transition-colors">
+                <Plus size={16} /> {t('settings.addInsurance', 'Add Insurance')}
+              </button>
+            </div>
 
-          {/* Add form */}
-          {addingIns && (
-            <div className="bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 rounded-xl p-4 mb-5">
-              <div className="grid grid-cols-2 gap-3 mb-3">
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 dark:text-gray-400 mb-1 block">Insurance Provider</label>
+            {addingIns && (
+              <div className="bg-slate-50 dark:bg-gray-800 p-5 rounded-2xl border border-slate-200 dark:border-gray-700 mb-6 flex items-end gap-4 flex-wrap">
+                <div className="flex-1 min-w-[200px]">
+                  <label className="block text-xs font-semibold text-slate-600 dark:text-gray-400 mb-1 uppercase tracking-wider">{t('settings.insuranceProvider', 'Insurance Provider')}</label>
                   <select value={newInsId} onChange={e => setNewInsId(e.target.value)} className={inputCls}>
-                    <option value="">Select...</option>
-                    {allInsurances
-                      .filter(ins => !pharmacyInsurances.some(pi => pi.insuranceId === ins.id))
+                    <option value="">{t('common.select', 'Select...')}</option>
+                    {allInsurances.filter(ins => !pharmacyInsurances.some(pi => pi.insuranceId === ins.id))
                       .map(ins => <option key={ins.id} value={ins.id}>{ins.providerName}</option>)}
                   </select>
                 </div>
@@ -358,35 +366,40 @@ export default function PharmacistSettings() {
                   <label className="text-xs font-semibold text-slate-600 dark:text-gray-400 mb-1 block">Coverage % for your pharmacy</label>
                   <input type="number" min="0" max="100" value={newInsCoverage} onChange={e => setNewInsCoverage(+e.target.value)} className={inputCls} />
                 </div>
+                <div className="flex gap-2">
+                    <button onClick={addInsurance} disabled={!newInsId} className="px-4 py-2 bg-sky-500 hover:bg-sky-600 disabled:bg-sky-300 text-white rounded-lg text-sm font-semibold transition-colors">Add</button>
+                    <button onClick={() => setAddingIns(false)} className="px-4 py-2 border border-slate-200 dark:border-gray-700 text-slate-600 dark:text-gray-400 rounded-lg text-sm hover:bg-slate-50 dark:hover:bg-gray-800 transition-colors">Cancel</button>
+                </div>
               </div>
-              <div className="flex gap-2">
-                <button onClick={addInsurance} disabled={!newInsId} className="px-4 py-2 bg-sky-500 hover:bg-sky-600 disabled:bg-sky-300 text-white rounded-lg text-sm font-semibold transition-colors">Add</button>
-                <button onClick={() => setAddingIns(false)} className="px-4 py-2 border border-slate-200 dark:border-gray-700 text-slate-600 dark:text-gray-400 rounded-lg text-sm hover:bg-slate-50 dark:hover:bg-gray-800 transition-colors">Cancel</button>
-              </div>
-            </div>
-          )}
+            )}
 
           {insLoading ? (
             <div className="flex justify-center py-8"><div className="w-6 h-6 border-4 border-sky-100 border-t-sky-500 rounded-full animate-spin" /></div>
           ) : pharmacyInsurances.length === 0 ? (
-            <div className="text-center py-10 text-slate-400 dark:text-gray-600 text-sm">No insurances added yet. Click "Add Insurance" to get started.</div>
+            <div className="text-center py-10 bg-slate-50 dark:bg-gray-800/50 rounded-2xl border border-slate-200 dark:border-gray-800 border-dashed">
+                <p className="text-slate-400 dark:text-gray-500 text-sm">{t('settings.noInsurances', 'No insurances added yet. Click "Add Insurance" to get started.')}</p>
+            </div>
           ) : (
             <div className="space-y-3">
               {pharmacyInsurances.map(pi => {
                 const pct = pi.coveragePercentage ?? pi.insurance?.defaultCoveragePercentage ?? 0;
                 const isEditing = editingInsId === pi.insuranceId;
                 return (
-                  <div key={pi.id} className="flex items-center gap-3 bg-slate-50 dark:bg-gray-800 rounded-xl px-4 py-3 border border-slate-100 dark:border-gray-700">
-                    {/* Clickable to view per-medicine coverage */}
-                    <button
-                      onClick={() => !isEditing && openInsuranceView(pi)}
-                      className="flex-1 text-left group"
-                    >
-                      <p className="text-sm font-semibold text-slate-800 dark:text-white group-hover:text-sky-600 transition-colors">
-                        {pi.insurance?.providerName}
-                      </p>
-                      <p className="text-xs text-slate-400 dark:text-gray-500">Click to see per-medicine coverage</p>
-                    </button>
+                  <div key={pi.id} className="flex items-center justify-between p-4 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-800 rounded-2xl hover:border-emerald-200 dark:hover:border-emerald-900/50 transition-colors group">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-500 rounded-full flex items-center justify-center font-bold">
+                        {pi.insurance?.providerName.charAt(0)}
+                      </div>
+                      <button
+                        onClick={() => !isEditing && openInsuranceView(pi)}
+                        className="text-left"
+                      >
+                        <h4 className="font-bold text-slate-800 dark:text-gray-200">{pi.insurance?.providerName}</h4>
+                        <p className="text-xs text-slate-500 dark:text-gray-400 flex items-center gap-1 cursor-pointer hover:text-emerald-500 transition-colors">
+                          {t('settings.patientPays', 'Patients pay {{pct}}% out-of-pocket', { pct: 100 - pct })} &bull; <span className="underline">{t('settings.clickForDetails', 'View details')}</span>
+                        </p>
+                      </button>
+                    </div>
 
                     {isEditing ? (
                       <div className="flex items-center gap-2">

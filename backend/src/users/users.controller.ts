@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Body, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Patch, Post, Body, UseGuards, Request, BadRequestException } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
@@ -15,5 +15,14 @@ export class UsersController {
   @Patch('me')
   updateProfile(@Request() req: any, @Body() body: any) {
     return this.usersService.updateProfile(req.user.id, body);
+  }
+
+  @Post('me/insurance/verify')
+  async verifyInsurance(@Request() req: any) {
+    try {
+      return await this.usersService.verifyInsurance(req.user.id);
+    } catch (e: any) {
+      throw new BadRequestException(e.message);
+    }
   }
 }
