@@ -69,18 +69,18 @@ import { PharmacyInsurance } from './pharmacies/entities/pharmacy-insurance.enti
           // Use URL if available (Neon / production)
           ...(dbUrl
             ? {
-                url: dbUrl,
-                ssl: { rejectUnauthorized: false },
-              }
+              url: dbUrl,
+              ssl: { rejectUnauthorized: false },
+            }
             : {
-                // Otherwise use local DB config
-                host: configService.get<string>('DB_HOST'),
-                port: configService.get<number>('DB_PORT') || 5432,
-                username: configService.get<string>('DB_USERNAME'),
-                password: configService.get<string>('DB_PASSWORD'),
-                database: configService.get<string>('DB_DATABASE'),
-                ssl: false,
-              }),
+              // Otherwise use local DB config
+              host: configService.get<string>('DB_HOST'),
+              port: configService.get<number>('DB_PORT') || 5432,
+              username: configService.get<string>('DB_USERNAME'),
+              password: configService.get<string>('DB_PASSWORD'),
+              database: configService.get<string>('DB_DATABASE'),
+              ssl: false,
+            }),
 
           entities: [
             User,
@@ -117,4 +117,4 @@ import { PharmacyInsurance } from './pharmacies/entities/pharmacy-insurance.enti
     { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })
-export class AppModule {}
+export class AppModule { }
