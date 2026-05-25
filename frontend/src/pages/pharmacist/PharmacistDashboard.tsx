@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { Package, ClipboardList, Plus, Search, Pencil, Trash2, Save, X, CheckCircle, XCircle, AlertCircle, RefreshCw, Bell } from 'lucide-react';
+import { Package, ClipboardList, Plus, Search, Pencil, Trash2, Save, X, CheckCircle, XCircle, AlertCircle, RefreshCw, Bell, Settings } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
+import PharmacistSettings from './PharmacistSettings';
+import { useAuth } from '../../context/AuthContext';
 
 /* ─── Types ─── */
 interface InvItem {
@@ -27,7 +30,9 @@ interface Medicine { id: string; name: string; category: string }
 
 /* ─── Component ─── */
 export default function PharmacistDashboard() {
-  const [activeTab, setActiveTab] = useState<'inventory' | 'reservations'>('inventory');
+  const { user } = useAuth();
+  const { t } = useTranslation();
+  const [activeTab, setActiveTab] = useState<'inventory' | 'reservations' | 'settings'>('inventory');
 
   /* Inventory state */
   const [inventory, setInventory] = useState<InvItem[]>([]);
@@ -41,6 +46,15 @@ export default function PharmacistDashboard() {
   const [editFields, setEditFields] = useState({ stock: 0, price: 0, lowStockThreshold: 10, expiryDate: '' });
   const [showAddForm, setShowAddForm] = useState(false);
   const [addFields, setAddFields] = useState({ medicineId: '', stock: 0, price: 0, expiryDate: '', lowStockThreshold: 10 });
+  // For creating a brand-new medicine from the dashboard (Issue #3)
+  const [creatingMedicine, setCreatingMedicine] = useState(false);
+  const [newMedFields, setNewMedFields] = useState({ name: '', category: 'OTHER', description: '' });
+  const [newMedLoading, setNewMedLoading] = useState(false);
+  // Per-insurance coverage % map for new medicine creation
+  const [newMedInsurances, setNewMedInsurances] = useState<Record<string, number>>({});
+
+  // Pharmacy insurances for coverage assignment in new medicine form
+  const [pharmacyInsurances, setPharmacyInsurances] = useState<any[]>([]);
 
   /* Reservations state */
   const [reservations, setReservations] = useState<Reservation[]>([]);
@@ -98,10 +112,18 @@ export default function PharmacistDashboard() {
     fetchInventory();
     fetchReservations(1);
 
+    // Load pharmacy insurances for the new medicine form
+    if (user?.pharmacy?.id) {
+      api.get(`/pharmacies/${user.pharmacy.id}/insurances`)
+        .then(res => setPharmacyInsurances(res.data))
+        .catch(() => {});
+    }
+
     // Poll reservations every 30 s for new PENDING items
     const poll = setInterval(() => fetchReservations(1), 30_000);
     return () => clearInterval(poll);
   }, []);
+
 
   const pendingCount = reservations.filter(r => r.status === 'PENDING').length;
   const filtered = inventory.filter(i => i.medicine.name.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -135,6 +157,36 @@ export default function PharmacistDashboard() {
       setShowAddForm(false);
       setAddFields({ medicineId: '', stock: 0, price: 0, expiryDate: '', lowStockThreshold: 10 });
     } catch (err: any) { alert(err.response?.data?.message || 'Failed to add medicine'); }
+  };
+
+  // Issue #3 — create a new medicine in the global catalogue then add to inventory
+  const createAndAddMedicine = async () => {
+    if (!newMedFields.name.trim()) return;
+    setNewMedLoading(true);
+    try {
+      const medRes = await api.post('/medicines', newMedFields);
+      const created = medRes.data;
+      // Refresh medicines list
+      setAllMedicines(prev => [...prev, created]);
+      // Pre-select the new medicine
+      setAddFields(f => ({ ...f, medicineId: created.id }));
+
+      // Save per-insurance coverage overrides for this pharmacy
+      const pharmacyId = user?.pharmacy?.id;
+      if (pharmacyId) {
+        const overrides = Object.entries(newMedInsurances);
+        await Promise.all(
+          overrides.map(([insuranceId, pct]) =>
+            api.patch(`/pharmacies/${pharmacyId}/insurances/${insuranceId}`, { coveragePercentage: pct })
+          )
+        );
+      }
+
+      setCreatingMedicine(false);
+      setNewMedFields({ name: '', category: 'OTHER', description: '' });
+      setNewMedInsurances({});
+    } catch (err: any) { alert(err.response?.data?.message || 'Failed to create medicine'); }
+    finally { setNewMedLoading(false); }
   };
 
   /* ── Reservation actions ── */
@@ -177,16 +229,16 @@ export default function PharmacistDashboard() {
       {/* Header */}
       <div className="mb-6 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold text-slate-800 dark:text-white tracking-tight">Pharmacist Command Center</h1>
-          <p className="text-slate-500 dark:text-gray-400 mt-1">Manage your inventory and patient reservations.</p>
+          <h1 className="text-3xl font-extrabold text-slate-800 dark:text-white tracking-tight">{t('dashboard.title')}</h1>
+          <p className="text-slate-500 dark:text-gray-400 mt-1">{t('dashboard.subtitle')}</p>
         </div>
         <div className="flex bg-slate-100 dark:bg-gray-800 p-1 rounded-xl border border-slate-200 dark:border-gray-700">
-          {(['inventory', 'reservations'] as const).map(tab => (
+          {(['inventory', 'reservations', 'settings'] as const).map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)}
               className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 capitalize
                 ${activeTab === tab ? 'bg-white dark:bg-gray-900 shadow text-sky-600' : 'text-slate-500 dark:text-gray-400 hover:text-slate-700 dark:hover:text-gray-200'}`}>
-              {tab === 'inventory' ? <Package size={16} /> : <ClipboardList size={16} />}
-              {tab}
+              {tab === 'inventory' ? <Package size={16} /> : tab === 'reservations' ? <ClipboardList size={16} /> : <Settings size={16} />}
+              {tab === 'inventory' ? t('dashboard.inventory') : tab === 'reservations' ? t('dashboard.reservations') : t('dashboard.settings')}
               {tab === 'reservations' && pendingCount > 0 && (
                 <span className="bg-red-500 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full animate-pulse">
                   {pendingCount}
@@ -205,10 +257,10 @@ export default function PharmacistDashboard() {
             <div className="relative flex-1">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-                placeholder="Search medicines..." className="w-full pl-9 pr-4 py-2.5 border border-slate-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white dark:bg-gray-900 dark:text-white dark:placeholder-gray-500" />
+                placeholder={t('dashboard.searchInventory')} className="w-full pl-9 pr-4 py-2.5 border border-slate-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white dark:bg-gray-900 dark:text-white dark:placeholder-gray-500" />
             </div>
             <button onClick={() => setShowAddForm(true)} className="flex items-center gap-2 px-4 py-2.5 bg-sky-500 hover:bg-sky-600 text-white rounded-xl text-sm font-semibold transition-colors">
-              <Plus size={16} /> Add Medicine
+              <Plus size={16} /> {t('dashboard.addMedicine')}
             </button>
             <button onClick={fetchInventory} className="flex items-center gap-2 px-3 py-2.5 border border-slate-200 dark:border-gray-700 text-slate-600 dark:text-gray-400 rounded-xl text-sm hover:bg-slate-50 dark:hover:bg-gray-800 transition-colors">
               <RefreshCw size={15} />
@@ -218,36 +270,112 @@ export default function PharmacistDashboard() {
           {/* Add Medicine Form */}
           {showAddForm && (
             <div className="bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 rounded-2xl p-5 mb-5">
-              <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2"><Plus size={16} className="text-sky-500" /> Add New Medicine to Inventory</h3>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                <div className="col-span-2 md:col-span-1">
-                  <label className="text-xs font-medium text-slate-600 mb-1 block">Medicine</label>
-                  <select value={addFields.medicineId} onChange={e => setAddFields({ ...addFields, medicineId: e.target.value })} className={inputClass}>
-                    <option value="">Select medicine...</option>
-                    {allMedicines.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-600 mb-1 block">Stock (units)</label>
-                  <input type="number" min="0" value={addFields.stock} onChange={e => setAddFields({ ...addFields, stock: +e.target.value })} className={inputClass} />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-600 mb-1 block">Price (RWF)</label>
-                  <input type="number" min="0" value={addFields.price} onChange={e => setAddFields({ ...addFields, price: +e.target.value })} className={inputClass} />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-600 mb-1 block">Expiry Date</label>
-                  <input type="date" value={addFields.expiryDate} onChange={e => setAddFields({ ...addFields, expiryDate: e.target.value })} className={inputClass} />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-600 mb-1 block">Low Stock Alert</label>
-                  <input type="number" min="1" value={addFields.lowStockThreshold} onChange={e => setAddFields({ ...addFields, lowStockThreshold: +e.target.value })} className={inputClass} />
-                </div>
+              <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2"><Plus size={16} className="text-sky-500" /> {t('dashboard.addMedicine')}</h3>
+
+              {/* Toggle: pick existing vs create new */}
+              <div className="flex gap-2 mb-4">
+                <button onClick={() => setCreatingMedicine(false)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                    !creatingMedicine ? 'bg-sky-500 text-white border-sky-500' : 'bg-white dark:bg-gray-800 text-slate-600 dark:text-gray-400 border-slate-200 dark:border-gray-700'
+                  }`}>{t('dashboard.pickExisting')}</button>
+                <button onClick={() => setCreatingMedicine(true)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                    creatingMedicine ? 'bg-sky-500 text-white border-sky-500' : 'bg-white dark:bg-gray-800 text-slate-600 dark:text-gray-400 border-slate-200 dark:border-gray-700'
+                  }`}>+ New Medicine</button>
               </div>
-              <div className="flex gap-2 mt-4">
-                <button onClick={addItem} disabled={!addFields.medicineId} className="px-5 py-2 bg-sky-500 hover:bg-sky-600 disabled:bg-sky-300 text-white rounded-lg text-sm font-semibold transition-colors">Add to Inventory</button>
-                <button onClick={() => setShowAddForm(false)} className="px-5 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm hover:bg-slate-50 transition-colors">Cancel</button>
-              </div>
+
+              {creatingMedicine ? (
+                // Issue #3 — create new medicine + assign insurance coverage
+                <div className="space-y-3 mb-4 bg-white dark:bg-gray-800 rounded-xl p-4 border border-slate-200 dark:border-gray-700">
+                  <h4 className="text-xs font-bold text-slate-700 dark:text-gray-300 uppercase tracking-wider">Create New Medicine</h4>
+                  <div>
+                    <label className="text-xs font-medium text-slate-600 dark:text-gray-400 mb-1 block">Medicine Name *</label>
+                    <input value={newMedFields.name} onChange={e => setNewMedFields(f => ({ ...f, name: e.target.value }))}
+                      placeholder="e.g. Doxycycline 100mg" className={inputClass} />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-600 dark:text-gray-400 mb-1 block">Category</label>
+                    <select value={newMedFields.category} onChange={e => setNewMedFields(f => ({ ...f, category: e.target.value }))} className={inputClass}>
+                      {['ANTIBIOTIC','PAINKILLER','VITAMIN','ANTIFUNGAL','ANTIVIRAL','CARDIOVASCULAR','DIABETIC','RESPIRATORY','GASTROINTESTINAL','DERMATOLOGICAL','OTHER'].map(c => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-600 dark:text-gray-400 mb-1 block">Description (optional)</label>
+                    <input value={newMedFields.description} onChange={e => setNewMedFields(f => ({ ...f, description: e.target.value }))}
+                      placeholder="Brief description..." className={inputClass} />
+                  </div>
+
+                  {/* Insurance Coverage Assignment */}
+                  {pharmacyInsurances.length > 0 && (
+                    <div className="border-t border-slate-200 dark:border-gray-700 pt-3">
+                      <label className="text-xs font-bold text-slate-700 dark:text-gray-300 uppercase tracking-wider mb-2 block">Insurance Coverage for this Medicine</label>
+                      <p className="text-[11px] text-slate-400 dark:text-gray-500 mb-3">Set the coverage % each of your insurances will cover for this medicine.</p>
+                      <div className="space-y-2">
+                        {pharmacyInsurances.map(pi => {
+                          const defaultPct = pi.coveragePercentage ?? pi.insurance?.defaultCoveragePercentage ?? 0;
+                          return (
+                            <div key={pi.insuranceId} className="flex items-center justify-between gap-3 bg-slate-50 dark:bg-gray-900 rounded-lg px-3 py-2 border border-slate-100 dark:border-gray-700">
+                              <span className="text-xs font-semibold text-slate-700 dark:text-gray-300 flex-1">{pi.insurance?.providerName}</span>
+                              <div className="flex items-center gap-1.5">
+                                <input
+                                  type="number" min="0" max="100"
+                                  value={newMedInsurances[pi.insuranceId] ?? defaultPct}
+                                  onChange={e => setNewMedInsurances(prev => ({ ...prev, [pi.insuranceId]: +e.target.value }))}
+                                  className="w-16 border border-slate-200 dark:border-gray-700 rounded-lg px-2 py-1 text-xs text-center focus:outline-none focus:ring-2 focus:ring-sky-300 dark:bg-gray-800 dark:text-white"
+                                />
+                                <span className="text-xs text-slate-400">%</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  <button onClick={createAndAddMedicine} disabled={newMedLoading || !newMedFields.name.trim()}
+                    className="px-4 py-2 bg-green-500 hover:bg-green-600 disabled:bg-green-300 text-white rounded-lg text-sm font-semibold transition-colors">
+                    {newMedLoading ? 'Creating...' : 'Create & Select'}
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  <div className="col-span-2 md:col-span-1">
+                    <label className="text-xs font-medium text-slate-600 mb-1 block">Medicine</label>
+                    <select value={addFields.medicineId} onChange={e => setAddFields({ ...addFields, medicineId: e.target.value })} className={inputClass}>
+                      <option value="">Select medicine...</option>
+                      {allMedicines.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-600 mb-1 block">Stock (units)</label>
+                    <input type="number" min="0" value={addFields.stock} onChange={e => setAddFields({ ...addFields, stock: +e.target.value })} className={inputClass} />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-600 mb-1 block">Price (RWF)</label>
+                    <input type="number" min="0" value={addFields.price} onChange={e => setAddFields({ ...addFields, price: +e.target.value })} className={inputClass} />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-600 mb-1 block">Expiry Date</label>
+                    <input type="date" value={addFields.expiryDate} onChange={e => setAddFields({ ...addFields, expiryDate: e.target.value })} className={inputClass} />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-600 mb-1 block">Low Stock Alert</label>
+                    <input type="number" min="1" value={addFields.lowStockThreshold} onChange={e => setAddFields({ ...addFields, lowStockThreshold: +e.target.value })} className={inputClass} />
+                  </div>
+                </div>
+              )}
+
+              {!creatingMedicine && (
+                <div className="flex gap-2 mt-4">
+                  <button onClick={addItem} disabled={!addFields.medicineId} className="px-5 py-2 bg-sky-500 hover:bg-sky-600 disabled:bg-sky-300 text-white rounded-lg text-sm font-semibold transition-colors">Add to Inventory</button>
+                  <button onClick={() => { setShowAddForm(false); setCreatingMedicine(false); }} className="px-5 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm hover:bg-slate-50 transition-colors">Cancel</button>
+                </div>
+              )}
+              {creatingMedicine && (
+                <button onClick={() => { setShowAddForm(false); setCreatingMedicine(false); }} className="mt-2 px-4 py-2 border border-slate-200 dark:border-gray-700 text-slate-600 dark:text-gray-400 rounded-lg text-sm hover:bg-slate-50 dark:hover:bg-gray-800 transition-colors">Cancel</button>
+              )}
             </div>
           )}
 
@@ -330,6 +458,9 @@ export default function PharmacistDashboard() {
           )}
         </div>
       )}
+
+      {/* ═══ SETTINGS TAB ═══ */}
+      {activeTab === 'settings' && <PharmacistSettings />}
 
       {/* ═══ RESERVATIONS TAB ═══ */}
       {activeTab === 'reservations' && (

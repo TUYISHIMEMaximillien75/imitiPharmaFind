@@ -1,28 +1,67 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Camera, MapPin, Filter, CalendarCheck, Stethoscope, Plus, X } from 'lucide-react';
-import api from '../../services/api';
+import { useTranslation } from 'react-i18next';
+import api, { BASE_URL } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+
+interface MedicineSuggestion {
+  id: string;
+  name: string;
+  category: string;
+}
 
 export default function LandingPage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
+  const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const suggestionRef = useRef<HTMLDivElement>(null);
 
   const [searchText, setSearchText] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
 
-  const addTag = () => {
-    const val = searchText.trim();
-    if (val && !tags.includes(val)) setTags([...tags, val]);
+  // Issue #10 — autocomplete
+  const [allMedicines, setAllMedicines] = useState<MedicineSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  useEffect(() => {
+    api.get('/medicines').then(res => setAllMedicines(res.data)).catch(() => {});
+  }, []);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (suggestionRef.current && !suggestionRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const filtered = searchText.trim()
+    ? allMedicines
+        .filter(m =>
+          m.name.toLowerCase().includes(searchText.toLowerCase()) &&
+          !tags.includes(m.name)
+        )
+        .slice(0, 8)
+    : [];
+
+  const addTag = (val?: string) => {
+    const name = (val ?? searchText).trim();
+    if (name && !tags.includes(name)) setTags([...tags, name]);
     setSearchText('');
+    setShowSuggestions(false);
   };
 
   const removeTag = (t: string) => setTags(tags.filter(x => x !== t));
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag(); }
+    if (e.key === 'Escape') setShowSuggestions(false);
   };
 
   const handleSearch = () => {
@@ -42,7 +81,7 @@ export default function LandingPage() {
       navigate('/verify', {
         state: {
           medicines: res.data.medicines.map((name: string, i: number) => ({ id: `${Date.now()}-${i}`, name })),
-          imageUrl: `http://localhost:3000${res.data.imageUrl}`,
+          imageUrl: `${BASE_URL}${res.data.imageUrl}`,
         },
       });
     } catch {
@@ -58,20 +97,20 @@ export default function LandingPage() {
         {/* Hero */}
         <div className="text-center max-w-3xl mx-auto mb-16">
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight mb-6 text-slate-800 dark:text-white">
-            Find the Medicines You Need,{' '}
+            {t('landing.title')}{' '}
             <br className="hidden md:block" />
-            <span className="text-sky-500">Fast &amp; Nearby.</span>
+            <span className="text-sky-500">{t('landing.titleHighlight')}</span>
           </h1>
           <p className="text-lg text-slate-500 dark:text-gray-400 mb-8 leading-relaxed">
-            Locate pharmacies in Musanze with your medicines in stock, open right now, and accepting your insurance.
+            {t('landing.subtitle')}
           </p>
           {!isAuthenticated && (
             <div className="flex items-center justify-center gap-3">
               <button onClick={() => navigate('/register')} className="px-6 py-3 bg-sky-500 hover:bg-sky-600 text-white font-semibold rounded-xl transition-all shadow-lg shadow-sky-500/20">
-                Get Started Free
+                {t('common.getStarted')}
               </button>
               <button onClick={() => navigate('/login')} className="px-6 py-3 border border-slate-200 dark:border-gray-700 text-slate-600 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-gray-800 font-semibold rounded-xl transition-all">
-                Sign In
+                {t('common.signIn')}
               </button>
             </div>
           )}
@@ -79,39 +118,63 @@ export default function LandingPage() {
 
         {/* Search Cards */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 max-w-5xl mx-auto">
-          {/* Text Search */}
+          {/* Text Search with Autocomplete */}
           <div className="lg:col-span-2 bg-white dark:bg-gray-900 rounded-3xl p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-gray-950/40 border border-slate-100 dark:border-gray-800 hover:shadow-lg transition-all">
             <h2 className="text-2xl font-bold mb-2 flex items-center gap-2 text-slate-800 dark:text-white">
-              <Search className="text-sky-500" size={24} /> Search by Medicine Name
+              <Search className="text-sky-500" size={24} /> {t('landing.searchTitle')}
             </h2>
-            <p className="text-slate-500 dark:text-gray-400 mb-5 text-sm">Type medicine names (press Enter after each) and hit Search.</p>
+            <p className="text-slate-500 dark:text-gray-400 mb-5 text-sm">{t('landing.searchSubtitle')}</p>
 
-            {/* Tag input */}
-            <div className="border-2 border-slate-200 dark:border-gray-700 focus-within:border-sky-500 rounded-2xl bg-slate-50 dark:bg-gray-800 focus-within:bg-white dark:focus-within:bg-gray-900 transition-all p-3 min-h-14">
-              <div className="flex flex-wrap gap-2 mb-2">
-                {tags.map(t => (
-                  <span key={t} className="flex items-center gap-1 bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-400 text-sm px-3 py-1 rounded-full font-medium">
-                    {t}
-                    <button onClick={() => removeTag(t)} className="hover:text-sky-900 dark:hover:text-sky-200"><X size={12} /></button>
-                  </span>
-                ))}
+            {/* Tag input with autocomplete */}
+            <div className="relative" ref={suggestionRef}>
+              <div className="border-2 border-slate-200 dark:border-gray-700 focus-within:border-sky-500 rounded-2xl bg-slate-50 dark:bg-gray-800 focus-within:bg-white dark:focus-within:bg-gray-900 transition-all p-3 min-h-14">
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {tags.map(t => (
+                    <span key={t} className="flex items-center gap-1 bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-400 text-sm px-3 py-1 rounded-full font-medium">
+                      {t}
+                      <button onClick={() => removeTag(t)} className="hover:text-sky-900 dark:hover:text-sky-200"><X size={12} /></button>
+                    </span>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    id="medicine-search-input"
+                    type="text"
+                    value={searchText}
+                    onChange={e => { setSearchText(e.target.value); setShowSuggestions(true); }}
+                    onKeyDown={handleKeyDown}
+                    onFocus={() => searchText && setShowSuggestions(true)}
+                    placeholder={tags.length === 0 ? t('landing.searchPlaceholder') : t('landing.searchMore')}
+                    className="flex-1 bg-transparent outline-none text-slate-800 dark:text-gray-100 placeholder-slate-400 dark:placeholder-gray-600 text-sm"
+                    autoComplete="off"
+                  />
+                  {searchText && (
+                    <button onClick={() => addTag()} className="text-sky-500 hover:text-sky-700 text-xs font-bold flex items-center gap-1">
+                      <Plus size={14} /> {t('landing.addTag')}
+                    </button>
+                  )}
+                </div>
               </div>
-              <div className="flex gap-2">
-                <input
-                  id="medicine-search-input"
-                  type="text"
-                  value={searchText}
-                  onChange={e => setSearchText(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder={tags.length === 0 ? 'e.g. Paracetamol, Amoxicillin...' : 'Add another...'}
-                  className="flex-1 bg-transparent outline-none text-slate-800 dark:text-gray-100 placeholder-slate-400 dark:placeholder-gray-600 text-sm"
-                />
-                {searchText && (
-                  <button onClick={addTag} className="text-sky-500 hover:text-sky-700 text-xs font-bold flex items-center gap-1">
-                    <Plus size={14} /> Add
-                  </button>
-                )}
-              </div>
+
+              {/* Autocomplete dropdown */}
+              {showSuggestions && filtered.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-2xl shadow-xl z-50 overflow-hidden">
+                  {filtered.map(m => (
+                    <button
+                      key={m.id}
+                      onMouseDown={() => addTag(m.name)}
+                      className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-sky-50 dark:hover:bg-sky-900/30 text-left transition-colors group"
+                    >
+                      <span className="text-sm font-medium text-slate-800 dark:text-gray-200 group-hover:text-sky-600">
+                        {m.name}
+                      </span>
+                      <span className="text-[10px] text-slate-400 dark:text-gray-500 bg-slate-100 dark:bg-gray-800 px-2 py-0.5 rounded-full capitalize">
+                        {m.category?.toLowerCase()}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="mt-4 flex items-center gap-3">
@@ -121,16 +184,16 @@ export default function LandingPage() {
                 disabled={tags.length === 0 && !searchText.trim()}
                 className="flex-1 bg-sky-500 hover:bg-sky-600 disabled:bg-slate-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed text-white disabled:text-slate-400 py-3 px-6 rounded-xl font-semibold transition-all shadow-lg shadow-sky-500/20"
               >
-                Search Nearby Pharmacies
+                {t('landing.searchBtn')}
               </button>
             </div>
 
             <div className="mt-4 flex items-center gap-4 text-sm text-slate-500 dark:text-gray-500">
               <span className="flex items-center gap-1 bg-slate-100 dark:bg-gray-800 px-3 py-1 rounded-full">
-                <MapPin size={13} /> Auto-detect location
+                <MapPin size={13} /> {t('landing.autoDetect')}
               </span>
               <span className="flex items-center gap-1 bg-slate-100 dark:bg-gray-800 px-3 py-1 rounded-full">
-                <Stethoscope size={13} /> Insurance filters
+                <Stethoscope size={13} /> {t('landing.insuranceFilters')}
               </span>
             </div>
           </div>
@@ -140,13 +203,7 @@ export default function LandingPage() {
             className={`bg-gradient-to-br from-white dark:from-gray-900 to-slate-50 dark:to-gray-800 rounded-3xl p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-gray-950/40 border border-slate-100 dark:border-gray-800 text-center flex flex-col justify-center relative overflow-hidden group hover:border-sky-300 dark:hover:border-sky-700 transition-colors ${isUploading ? 'cursor-wait opacity-80' : 'cursor-pointer'}`}
             onClick={() => !isUploading && fileInputRef.current?.click()}
           >
-            <input
-              ref={fileInputRef}
-              type="file"
-              className="hidden"
-              accept="image/*"
-              onChange={e => e.target.files?.[0] && handleFileSelected(e.target.files[0])}
-            />
+            <input ref={fileInputRef} type="file" className="hidden" accept="image/*" onChange={e => e.target.files?.[0] && handleFileSelected(e.target.files[0])} />
             <div className="absolute top-0 right-0 -mr-8 -mt-8 w-32 h-32 bg-sky-100 dark:bg-sky-900/20 rounded-full blur-2xl opacity-50 group-hover:opacity-100 transition-opacity" />
             <div className="mx-auto bg-sky-50 dark:bg-sky-900/30 text-sky-500 w-20 h-20 rounded-full flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-sky-500 group-hover:text-white transition-all duration-300 shadow-inner">
               {isUploading ? (
@@ -155,29 +212,29 @@ export default function LandingPage() {
                 <Camera size={36} strokeWidth={2} />
               )}
             </div>
-            <h2 className="text-xl font-bold mb-2 relative z-10 text-slate-800 dark:text-white">Upload Prescription</h2>
+            <h2 className="text-xl font-bold mb-2 relative z-10 text-slate-800 dark:text-white">{t('landing.uploadTitle')}</h2>
             <p className="text-slate-500 dark:text-gray-400 text-sm mb-6 relative z-10">
-              {isUploading ? 'Analyzing your prescription...' : "Snap a picture of your prescription and we'll extract the medicines automatically."}
+              {isUploading ? t('landing.uploading') : t('landing.uploadSubtitle')}
             </p>
             <div className="w-full bg-slate-800 dark:bg-gray-700 group-hover:bg-slate-900 dark:group-hover:bg-gray-600 text-white font-semibold py-3 px-4 rounded-xl transition-colors relative z-10 text-sm">
-              {isUploading ? 'Processing...' : 'Choose Image'}
+              {isUploading ? t('landing.uploadProcessing') : t('landing.uploadBtn')}
             </div>
           </div>
         </div>
       </main>
 
-      {/* How It Works section */}
+      {/* How It Works */}
       <section className="bg-white dark:bg-gray-900 border-t border-slate-100 dark:border-gray-800 py-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold text-slate-800 dark:text-white mb-4">How It Works</h2>
-            <p className="text-slate-500 dark:text-gray-400 max-w-2xl mx-auto">Find medicines fast — no more driving from pharmacy to pharmacy.</p>
+            <h2 className="text-3xl font-bold text-slate-800 dark:text-white mb-4">{t('landing.howItWorks')}</h2>
+            <p className="text-slate-500 dark:text-gray-400 max-w-2xl mx-auto">{t('landing.howSubtitle')}</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
             {[
-              { icon: <Search size={28} />, title: '1. Search & Upload', desc: 'Type medicine names or photograph your prescription for automatic extraction.' },
-              { icon: <Filter size={28} />, title: '2. Filter & Compare', desc: 'See which nearby pharmacies have all your medicines, are open, and accept your insurance.' },
-              { icon: <CalendarCheck size={28} />, title: '3. Reserve & Go', desc: 'Reserve your medicines online or simply walk in — the choice is yours.' },
+              { icon: <Search size={28} />, title: t('landing.step1Title'), desc: t('landing.step1Desc') },
+              { icon: <Filter size={28} />, title: t('landing.step2Title'), desc: t('landing.step2Desc') },
+              { icon: <CalendarCheck size={28} />, title: t('landing.step3Title'), desc: t('landing.step3Desc') },
             ].map((item, i) => (
               <div key={i} className="text-center group">
                 <div className="mx-auto w-16 h-16 bg-sky-50 dark:bg-sky-900/30 rounded-2xl flex items-center justify-center mb-6 text-sky-500 group-hover:-translate-y-2 transition-transform duration-300">

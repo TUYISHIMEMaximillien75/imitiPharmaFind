@@ -1,30 +1,21 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { User, Phone, Mail, Save, Loader2, CheckCircle2, Shield } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 
-interface Insurance {
-  id: string;
-  providerName: string;
-  defaultCoveragePercentage: number;
-}
-
 export default function ProfilePage() {
   const { user, updateUser } = useAuth();
+  const { t } = useTranslation();
 
   const [form, setForm] = useState({
     firstName: user?.firstName || '',
     lastName: user?.lastName || '',
     phone: user?.phone || '',
   });
-  const [insurances, setInsurances] = useState<Insurance[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    api.get('/insurances').then(res => setInsurances(res.data)).catch(() => {});
-  }, []);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -50,8 +41,8 @@ export default function ProfilePage() {
           <User size={32} className="text-sky-500" />
         </div>
         <div>
-          <h1 className="text-2xl font-extrabold text-slate-800 dark:text-white">My Profile</h1>
-          <p className="text-slate-500 dark:text-gray-400 text-sm mt-0.5">Manage your personal information</p>
+          <h1 className="text-2xl font-extrabold text-slate-800 dark:text-white">{t('profile.title')}</h1>
+          <p className="text-slate-500 dark:text-gray-400 text-sm mt-0.5">{t('profile.subtitle')}</p>
         </div>
       </div>
 
@@ -63,11 +54,11 @@ export default function ProfilePage() {
 
       {/* Form Card */}
       <div className="bg-white dark:bg-gray-900 rounded-3xl border border-slate-200 dark:border-gray-800 shadow-sm p-6 sm:p-8 mb-6">
-        <h2 className="font-bold text-slate-700 dark:text-gray-300 mb-5 text-sm uppercase tracking-wider">Personal Information</h2>
+        <h2 className="font-bold text-slate-700 dark:text-gray-300 mb-5 text-sm uppercase tracking-wider">{t('profile.personalInfo')}</h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
           <div>
-            <label className="text-xs font-semibold text-slate-500 mb-1.5 block">First Name</label>
+            <label className="text-xs font-semibold text-slate-500 mb-1.5 block">{t('profile.firstName')}</label>
             <input
               id="profile-firstName"
               type="text"
@@ -78,7 +69,7 @@ export default function ProfilePage() {
             />
           </div>
           <div>
-            <label className="text-xs font-semibold text-slate-500 mb-1.5 block">Last Name</label>
+            <label className="text-xs font-semibold text-slate-500 mb-1.5 block">{t('profile.lastName')}</label>
             <input
               id="profile-lastName"
               type="text"
@@ -92,7 +83,7 @@ export default function ProfilePage() {
 
         <div className="mb-4">
           <label className="text-xs font-semibold text-slate-500 mb-1.5 flex items-center gap-1">
-            <Phone size={11} /> Phone Number
+            <Phone size={11} /> {t('profile.phone')}
           </label>
           <input
             id="profile-phone"
@@ -106,7 +97,7 @@ export default function ProfilePage() {
 
         <div className="mb-6">
           <label className="text-xs font-semibold text-slate-500 mb-1.5 flex items-center gap-1">
-            <Mail size={11} /> Email Address
+            <Mail size={11} /> {t('profile.email')}
           </label>
           <input
             type="email"
@@ -114,7 +105,7 @@ export default function ProfilePage() {
             disabled
             className="w-full border border-slate-100 dark:border-gray-800 rounded-xl px-4 py-2.5 text-sm bg-slate-50 dark:bg-gray-800 text-slate-400 dark:text-gray-600 cursor-not-allowed"
           />
-          <p className="text-xs text-slate-400 dark:text-gray-600 mt-1">Email cannot be changed</p>
+          <p className="text-xs text-slate-400 dark:text-gray-600 mt-1">{t('profile.emailNote')}</p>
         </div>
 
         {error && (
@@ -130,32 +121,14 @@ export default function ProfilePage() {
           className="w-full flex items-center justify-center gap-2 bg-sky-500 hover:bg-sky-600 disabled:bg-sky-300 text-white font-semibold py-3 rounded-xl transition-all"
         >
           {isSaving ? (
-            <><Loader2 size={16} className="animate-spin" /> Saving...</>
+            <><Loader2 size={16} className="animate-spin" /> {t('common.saving')}</>
           ) : saved ? (
-            <><CheckCircle2 size={16} /> Saved!</>
+            <><CheckCircle2 size={16} /> {t('profile.saved')}</>
           ) : (
-            <><Save size={16} /> Save Changes</>
+            <><Save size={16} /> {t('profile.saveChanges')}</>
           )}
         </button>
       </div>
-
-      {/* Insurance info card */}
-      {insurances.length > 0 && (
-        <div className="bg-white dark:bg-gray-900 rounded-3xl border border-slate-200 dark:border-gray-800 shadow-sm p-6 sm:p-8">
-          <h2 className="font-bold text-slate-700 dark:text-gray-300 mb-1 text-sm uppercase tracking-wider">Accepted Insurances in Musanze</h2>
-          <p className="text-xs text-slate-400 dark:text-gray-600 mb-5">Pharmacies that accept these insurances will appear first in your search results.</p>
-          <div className="space-y-2">
-            {insurances.map(ins => (
-              <div key={ins.id} className="flex items-center justify-between bg-slate-50 dark:bg-gray-800 rounded-xl px-4 py-3 border border-slate-100 dark:border-gray-700">
-                <span className="text-sm font-semibold text-slate-700 dark:text-gray-200">{ins.providerName}</span>
-                <span className="text-xs font-bold text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 border border-green-100 dark:border-green-800 px-2 py-0.5 rounded-full">
-                  {ins.defaultCoveragePercentage}% covered
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </main>
   );
 }

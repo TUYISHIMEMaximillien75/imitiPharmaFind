@@ -1,5 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToMany } from 'typeorm';
-import { Pharmacy } from '../../pharmacies/entities/pharmacy.entity';
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
+import { PharmacyInsurance } from '../../pharmacies/entities/pharmacy-insurance.entity';
 
 @Entity('insurances')
 export class Insurance {
@@ -7,11 +7,11 @@ export class Insurance {
   id: string;
 
   @Column({ unique: true })
-  providerName: string; // e.g. RAMA, MMI, CBHI
+  providerName: string; // e.g. RAMA, MMI, CBHI, Mutuelle de Santé
 
   @Column({ type: 'decimal', precision: 5, scale: 2, default: 0 })
-  defaultCoveragePercentage: number; // e.g. 85.00
+  defaultCoveragePercentage: number; // global default e.g. 85.00
 
-  @ManyToMany(() => Pharmacy, pharmacy => pharmacy.insurances)
-  pharmacies: Pharmacy[];
+  @OneToMany(() => PharmacyInsurance, (pi) => pi.insurance)
+  pharmacyInsurances: PharmacyInsurance[];
 }

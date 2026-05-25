@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
-import { CheckCircle, Pencil, Trash2, Plus, Save, X, AlertCircle, ArrowLeft } from 'lucide-react';
-import api from '../../services/api';
+import { CheckCircle, Pencil, Trash2, Plus, Save, X, AlertCircle, ArrowLeft, ImageOff } from 'lucide-react';
+import api, { BASE_URL } from '../../services/api';
 
 interface Medicine { id: string; name: string }
 
@@ -14,6 +14,7 @@ export default function VerificationPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [imgError, setImgError] = useState(false);
 
   if (!state?.medicines) {
     return (
@@ -46,7 +47,7 @@ export default function VerificationPage() {
       if (state?.imageUrl) {
         await api.post('/prescriptions', {
           medicines: validMeds.map(m => m.name),
-          imageUrl: state.imageUrl.replace('http://localhost:3000', ''),
+          imageUrl: state.imageUrl.replace(BASE_URL, ''),
         });
       }
     } catch { /* non-blocking */ }
@@ -67,10 +68,30 @@ export default function VerificationPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Prescription preview */}
         {state?.imageUrl && (
-          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
-            <h2 className="font-bold text-slate-700 mb-4 text-sm uppercase tracking-wider">Your Prescription</h2>
-            <div className="rounded-2xl overflow-hidden border border-slate-100 bg-slate-50">
-              <img src={state.imageUrl} alt="Prescription" className="w-full object-contain max-h-80" />
+          <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 border border-slate-200 dark:border-gray-800 shadow-sm">
+            <h2 className="font-bold text-slate-700 dark:text-gray-300 mb-4 text-sm uppercase tracking-wider">Your Prescription</h2>
+            <div className="rounded-2xl overflow-hidden border border-slate-100 dark:border-gray-700 bg-slate-50 dark:bg-gray-800 min-h-32 flex items-center justify-center">
+              {imgError ? (
+                <div className="flex flex-col items-center gap-3 py-10 text-slate-400 dark:text-gray-500">
+                  <ImageOff size={40} />
+                  <p className="text-sm">Could not load prescription image.</p>
+                  <a
+                    href={state.imageUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs text-sky-500 underline"
+                  >
+                    Open directly
+                  </a>
+                </div>
+              ) : (
+                <img
+                  src={state.imageUrl}
+                  alt="Prescription"
+                  className="w-full object-contain max-h-80"
+                  onError={() => setImgError(true)}
+                />
+              )}
             </div>
           </div>
         )}

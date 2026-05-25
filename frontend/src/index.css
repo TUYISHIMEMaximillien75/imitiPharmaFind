@@ -46,3 +46,29 @@
     border-color: rgba(255, 255, 255, 0.08);
   }
 }
+
+/* ─── RTL support (Arabic) ─── */
+[dir="rtl"] {
+  /* Cairo from Google Fonts — clean, modern Arabic typeface */
+  font-family: 'Cairo', 'Noto Sans Arabic', 'Segoe UI',
+               system-ui, -apple-system, sans-serif;
+  text-align: right;
+}
+
+/* Flip flex rows in RTL */
+[dir="rtl"] .flex { direction: rtl; }
+
+/* Fix icon-text gap direction in nav links & badges */
+[dir="rtl"] .flex.items-center.gap-1,
+[dir="rtl"] .flex.items-center.gap-1\.5,
+[dir="rtl"] .flex.items-center.gap-2 {
+  flex-direction: row-reverse;
+}
+
+/* Ensure inputs are still left-to-right for numbers/emails */
+[dir="rtl"] input[type="email"],
+[dir="rtl"] input[type="number"],
+[dir="rtl"] input[type="password"] {
+  direction: ltr;
+  text-align: left;
+}

@@ -4,6 +4,7 @@ import {
   ArrowLeft, MapPin, Filter, CheckCircle2, XCircle, Clock,
   Pill, ChevronRight, AlertCircle, Loader2, X, Map
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 
@@ -17,9 +18,10 @@ interface PharmacyResult {
   phone?: string;
   openingTime: number;
   closingTime: number;
-  availableMeds: { medicineId: string; name: string; price: number; stock: number }[];
+  availableMeds: { medicineId: string; name: string; price: number; stock: number; imageUrl?: string }[];
   totalPrice: number;
   isOpen: boolean;
+  insurances?: { id: string; providerName: string; coveragePercentage: number }[];
 }
 
 interface ReservationItem {
@@ -39,6 +41,7 @@ export default function SearchResultsPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
+  const { t } = useTranslation();
   const state = location.state as { medicines?: string[] } | null;
 
   const [results, setResults] = useState<PharmacyResult[]>([]);
@@ -136,11 +139,11 @@ export default function SearchResultsPage() {
             onClick={() => navigate('/')}
             className="flex items-center gap-2 text-slate-500 dark:text-gray-400 hover:text-sky-600 mb-2 font-semibold transition-colors text-sm"
           >
-            <ArrowLeft size={16} /> New Search
+            <ArrowLeft size={16} /> {t('common.back')}
           </button>
-          <h1 className="text-3xl font-extrabold text-slate-800 dark:text-white tracking-tight">Search Results</h1>
+          <h1 className="text-3xl font-extrabold text-slate-800 dark:text-white tracking-tight">{t('search.title')}</h1>
           <p className="text-slate-500 dark:text-gray-400 flex items-center gap-1 mt-1 font-medium">
-            <MapPin size={16} /> Nearest Pharmacies in Musanze
+            <MapPin size={16} /> {t('search.subtitle')}
           </p>
         </div>
         <div className="flex items-center gap-2 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-xl px-4 py-2 shadow-sm text-sm">
@@ -156,7 +159,7 @@ export default function SearchResultsPage() {
       {/* Insurance filter bar */}
       <div className="flex flex-wrap items-center gap-3 mb-6 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-2xl p-4 shadow-sm">
         <span className="text-sm font-semibold text-slate-600 dark:text-gray-300 flex items-center gap-1.5">
-          <Filter size={15} className="text-sky-500" /> Insurance Filter:
+          <Filter size={15} className="text-sky-500" /> {t('search.filterInsurance')}:
         </span>
         <div className="flex flex-wrap gap-2">
           <button
@@ -167,7 +170,7 @@ export default function SearchResultsPage() {
                 : 'bg-white text-slate-600 border-slate-200 hover:border-sky-300'
             }`}
           >
-            Any Insurance
+            {t('search.allInsurances')}
           </button>
           {insurances.map(ins => (
             <button
@@ -187,7 +190,7 @@ export default function SearchResultsPage() {
 
       {/* Medicine tags */}
       <div className="flex flex-wrap gap-2 mb-6 bg-sky-50 border border-sky-100 rounded-2xl p-4">
-        <span className="text-slate-600 text-sm font-semibold mr-1">Searching for:</span>
+        <span className="text-slate-600 text-sm font-semibold mr-1">{t('search.yourMedicines')}:</span>
         {medicines.map((m, i) => (
           <span key={i} className="bg-sky-500 text-white text-xs font-semibold px-3 py-1 rounded-full">{m}</span>
         ))}
@@ -197,7 +200,7 @@ export default function SearchResultsPage() {
       {isLoading && (
         <div className="flex flex-col items-center justify-center py-24 gap-4">
           <Loader2 size={48} className="text-sky-500 animate-spin" />
-          <p className="text-slate-600 font-medium">Finding pharmacies near you...</p>
+          <p className="text-slate-600 font-medium">{t('search.searching')}</p>
         </div>
       )}
 
@@ -207,7 +210,7 @@ export default function SearchResultsPage() {
             <AlertCircle size={18} className="shrink-0" /> {error}
           </div>
           <button onClick={searchPharmacies} className="px-6 py-2.5 bg-sky-500 text-white rounded-xl font-semibold hover:bg-sky-600 transition-colors">
-            Try Again
+            {t('common.refresh')}
           </button>
         </div>
       )}
@@ -217,8 +220,8 @@ export default function SearchResultsPage() {
           <div className="w-20 h-20 bg-slate-100 rounded-3xl flex items-center justify-center mx-auto mb-4">
             <Pill size={36} className="text-slate-400" />
           </div>
-          <h3 className="text-xl font-bold text-slate-700 mb-2">No pharmacies found</h3>
-          <p className="text-slate-400 mb-6 max-w-sm mx-auto">No nearby pharmacy has all the requested medicines in stock and open right now.</p>
+          <h3 className="text-xl font-bold text-slate-700 mb-2">{t('search.noResults')}</h3>
+          <p className="text-slate-400 mb-6 max-w-sm mx-auto">{t('search.noResultsSubtitle')}</p>
           <button onClick={() => navigate('/')} className="px-6 py-3 bg-sky-500 text-white font-semibold rounded-xl hover:bg-sky-600 transition-colors">
             Try Different Medicines
           </button>
@@ -231,7 +234,8 @@ export default function SearchResultsPage() {
           {/* Sort + Map toggle bar */}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-slate-500 text-sm font-medium">
-              <span className="font-bold text-slate-800">{sorted.length}</span> pharmacie{sorted.length !== 1 ? 's' : ''} found
+              <span className="font-bold text-slate-800">{sorted.length}</span>{' '}
+              {sorted.length !== 1 ? t('search.foundPharmacies_plural', { count: '' }).replace('{{count}}', '') : t('search.foundPharmacies', { count: '' }).replace('{{count}}', '')}
             </p>
             <div className="flex items-center gap-2">
               <span className="text-xs text-slate-500">Sort:</span>
@@ -310,6 +314,14 @@ export default function SearchResultsPage() {
                 <div className="flex flex-wrap gap-2 mb-5">
                   {pharmacy.availableMeds.map((m, i) => (
                     <div key={i} className="flex items-center gap-2 bg-green-50 border border-green-100 text-green-700 rounded-xl px-3 py-1.5 text-sm font-medium">
+                      {m.imageUrl && (
+                        <img
+                          src={m.imageUrl}
+                          alt={m.name}
+                          className="w-7 h-7 rounded-lg object-cover shrink-0 border border-green-200"
+                          onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                        />
+                      )}
                       <CheckCircle2 size={13} />
                       {m.name}
                       <span className="text-green-500 font-bold">{Number(m.price).toLocaleString()} RWF</span>

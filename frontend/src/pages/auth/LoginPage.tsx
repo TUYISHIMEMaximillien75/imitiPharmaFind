@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 import logo from '../../assets/system_icon.png';
@@ -15,6 +16,7 @@ function LeafIcon({ size = 10 }: { size?: number }) {
 
 export default function LoginPage() {
   const { login } = useAuth();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const from = (location.state as any)?.from?.pathname || '/';
@@ -78,12 +80,12 @@ export default function LoginPage() {
               <p className="text-[10px] text-slate-500 mt-0.5 tracking-wide">Musanze · Rwanda</p>
             </div>
           </div>
-          <p className="text-slate-400">Welcome back — sign in to continue</p>
+          <p className="text-slate-400">{t('auth.welcomeBack')}</p>
         </div>
 
         {/* Card */}
         <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl">
-          <h1 className="text-xl font-bold text-white mb-6">Sign In</h1>
+          <h1 className="text-xl font-bold text-white mb-6">{t('auth.signIn')}</h1>
 
           {error && (
             <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl p-3 mb-5 text-sm">
@@ -95,7 +97,7 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1.5">Email address</label>
+              <label className="block text-sm font-medium text-slate-300 mb-1.5">{t('auth.emailLabel')}</label>
               <div className="relative">
                 <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
                 <input
@@ -112,7 +114,7 @@ export default function LoginPage() {
 
             {/* Password */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1.5">Password</label>
+              <label className="block text-sm font-medium text-slate-300 mb-1.5">{t('auth.passwordLabel')}</label>
               <div className="relative">
                 <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
                 <input
@@ -143,16 +145,16 @@ export default function LoginPage() {
               {isLoading ? (
                 <span className="flex items-center justify-center gap-2">
                   <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Signing in...
+                  {t('auth.signingIn')}
                 </span>
-              ) : 'Sign In'}
+              ) : t('auth.signIn')}
             </button>
           </form>
 
           <p className="text-center text-slate-500 text-sm mt-6">
-            Don't have an account?{' '}
+            {t('auth.noAccount')}{' '}
             <Link to="/register" className="text-sky-400 hover:text-sky-300 font-semibold transition-colors">
-              Create account
+              {t('auth.createAccount')}
             </Link>
           </p>
         </div>
