@@ -44,7 +44,7 @@ export default function PharmacistSettings() {
   const [saveError, setSaveError] = useState('');
 
   // Profile form
-  const [profile, setProfile] = useState({ name: '', address: '', phone: '', description: '' });
+  const [profile, setProfile] = useState({ name: '', address: '', phone: '', description: '', offersDelivery: false });
 
   // Hours form
   const [hours, setHours] = useState({ openingTime: 8, closingTime: 20 });
@@ -54,8 +54,12 @@ export default function PharmacistSettings() {
   const [pharmacyInsurances, setPharmacyInsurances] = useState<PharmacyInsurance[]>([]);
   const [insLoading, setInsLoading] = useState(false);
   const [addingIns, setAddingIns] = useState(false);
+  const [addingInsMode, setAddingInsMode] = useState<'existing' | 'new'>('existing');
   const [newInsId, setNewInsId] = useState('');
   const [newInsCoverage, setNewInsCoverage] = useState<number>(85);
+  const [newInsName, setNewInsName] = useState('');
+  const [newInsDefaultCoverage, setNewInsDefaultCoverage] = useState<number>(80);
+  const [creatingIns, setCreatingIns] = useState(false);
   const [editingInsId, setEditingInsId] = useState<string | null>(null);
   const [editCoverage, setEditCoverage] = useState<number>(85);
 
@@ -74,7 +78,7 @@ export default function PharmacistSettings() {
       .then(res => {
         const p = res.data;
         setPharmacy(p);
-        setProfile({ name: p.name ?? '', address: p.address ?? '', phone: p.phone ?? '', description: p.description ?? '' });
+        setProfile({ name: p.name ?? '', address: p.address ?? '', phone: p.phone ?? '', description: p.description ?? '', offersDelivery: p.offersDelivery ?? false });
         setHours({ openingTime: p.openingTime ?? 8, closingTime: p.closingTime ?? 20 });
       })
       .catch(() => {})
@@ -130,6 +134,30 @@ export default function PharmacistSettings() {
       setPharmacyInsurances(prev => [...prev, res.data]);
       setNewInsId(''); setNewInsCoverage(85); setAddingIns(false);
     } catch (e: any) { alert(e.response?.data?.message || 'Failed to add insurance'); }
+  };
+
+  const createAndAddInsurance = async () => {
+    if (!newInsName.trim()) return;
+    setCreatingIns(true);
+    try {
+      // 1. Create the global insurance company
+      const insRes = await api.post('/insurances', {
+        providerName: newInsName.trim(),
+        defaultCoveragePercentage: newInsDefaultCoverage,
+      });
+      const newIns: Insurance = insRes.data;
+      setAllInsurances(prev => [...prev, newIns]);
+      // 2. Link it to this pharmacy
+      const piRes = await api.post(`/pharmacies/${pharmacyId}/insurances`, {
+        insuranceId: newIns.id,
+        coveragePercentage: newInsDefaultCoverage,
+      });
+      setPharmacyInsurances(prev => [...prev, piRes.data]);
+      setNewInsName(''); setNewInsDefaultCoverage(80);
+      setAddingIns(false);
+    } catch (e: any) {
+      alert(e.response?.data?.message || 'Failed to create insurance');
+    } finally { setCreatingIns(false); }
   };
 
   const updateInsurance = async (insuranceId: string) => {
@@ -297,6 +325,25 @@ export default function PharmacistSettings() {
                 <textarea value={profile.description} onChange={e => setProfile({ ...profile, description: e.target.value })} className={inputCls} rows={3} />
               </div>
 
+              {/* Delivery Toggle */}
+              <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-gray-800 rounded-2xl border border-slate-200 dark:border-gray-700">
+                <div>
+                  <p className="text-sm font-semibold text-slate-700 dark:text-gray-300">🚚 Offer Home Delivery</p>
+                  <p className="text-xs text-slate-400 dark:text-gray-500 mt-0.5">Patients can request medicines delivered to their address.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setProfile(p => ({ ...p, offersDelivery: !p.offersDelivery }))}
+                  className={`relative w-12 h-6 rounded-full transition-colors duration-300 focus:outline-none ${
+                    profile.offersDelivery ? 'bg-sky-500' : 'bg-slate-300 dark:bg-gray-600'
+                  }`}
+                >
+                  <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-300 ${
+                    profile.offersDelivery ? 'translate-x-6' : 'translate-x-0.5'
+                  }`} />
+                </button>
+              </div>
+
               <button onClick={saveProfile} disabled={saving} className="px-6 py-2.5 bg-sky-500 hover:bg-sky-600 disabled:bg-sky-300 text-white font-semibold rounded-xl transition-all shadow-md shadow-sky-500/20 flex items-center gap-2 mt-4">
                 <Save size={18} /> {saving ? t('common.saving', 'Saving...') : t('settings.saveProfile', 'Save Profile')}
               </button>
@@ -347,29 +394,87 @@ export default function PharmacistSettings() {
               <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
                 <Shield className="text-emerald-500" /> {t('settings.acceptedInsurances', 'Accepted Insurances')}
               </h2>
-              <button onClick={() => setAddingIns(true)} className="flex items-center gap-2 text-sm font-semibold text-sky-600 hover:text-sky-700 bg-sky-50 hover:bg-sky-100 dark:bg-sky-900/20 dark:hover:bg-sky-900/40 px-4 py-2 rounded-xl transition-colors">
-                <Plus size={16} /> {t('settings.addInsurance', 'Add Insurance')}
-              </button>
+              {!addingIns && (
+                <button onClick={() => { setAddingIns(true); setAddingInsMode('existing'); }} className="flex items-center gap-2 text-sm font-semibold text-sky-600 hover:text-sky-700 bg-sky-50 hover:bg-sky-100 dark:bg-sky-900/20 dark:hover:bg-sky-900/40 px-4 py-2 rounded-xl transition-colors">
+                  <Plus size={16} /> Add Insurance
+                </button>
+              )}
             </div>
 
             {addingIns && (
-              <div className="bg-slate-50 dark:bg-gray-800 p-5 rounded-2xl border border-slate-200 dark:border-gray-700 mb-6 flex items-end gap-4 flex-wrap">
-                <div className="flex-1 min-w-[200px]">
-                  <label className="block text-xs font-semibold text-slate-600 dark:text-gray-400 mb-1 uppercase tracking-wider">{t('settings.insuranceProvider', 'Insurance Provider')}</label>
-                  <select value={newInsId} onChange={e => setNewInsId(e.target.value)} className={inputCls}>
-                    <option value="">{t('common.select', 'Select...')}</option>
-                    {allInsurances.filter(ins => !pharmacyInsurances.some(pi => pi.insuranceId === ins.id))
-                      .map(ins => <option key={ins.id} value={ins.id}>{ins.providerName}</option>)}
-                  </select>
+              <div className="bg-slate-50 dark:bg-gray-800 p-5 rounded-2xl border border-slate-200 dark:border-gray-700 mb-6">
+                {/* Mode toggle */}
+                <div className="flex gap-2 mb-4">
+                  <button
+                    onClick={() => setAddingInsMode('existing')}
+                    className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-all ${
+                      addingInsMode === 'existing' ? 'bg-sky-500 text-white border-sky-500' : 'bg-white dark:bg-gray-700 text-slate-600 dark:text-gray-300 border-slate-200 dark:border-gray-600'
+                    }`}
+                  >
+                    Link Existing Insurance
+                  </button>
+                  <button
+                    onClick={() => setAddingInsMode('new')}
+                    className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-all ${
+                      addingInsMode === 'new' ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white dark:bg-gray-700 text-slate-600 dark:text-gray-300 border-slate-200 dark:border-gray-600'
+                    }`}
+                  >
+                    ✨ Create New Insurance Company
+                  </button>
                 </div>
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 dark:text-gray-400 mb-1 block">Coverage % for your pharmacy</label>
-                  <input type="number" min="0" max="100" value={newInsCoverage} onChange={e => setNewInsCoverage(+e.target.value)} className={inputCls} />
-                </div>
-                <div className="flex gap-2">
-                    <button onClick={addInsurance} disabled={!newInsId} className="px-4 py-2 bg-sky-500 hover:bg-sky-600 disabled:bg-sky-300 text-white rounded-lg text-sm font-semibold transition-colors">Add</button>
-                    <button onClick={() => setAddingIns(false)} className="px-4 py-2 border border-slate-200 dark:border-gray-700 text-slate-600 dark:text-gray-400 rounded-lg text-sm hover:bg-slate-50 dark:hover:bg-gray-800 transition-colors">Cancel</button>
-                </div>
+
+                {addingInsMode === 'existing' ? (
+                  <div className="flex items-end gap-4 flex-wrap">
+                    <div className="flex-1 min-w-[200px]">
+                      <label className="block text-xs font-semibold text-slate-600 dark:text-gray-400 mb-1 uppercase tracking-wider">Insurance Provider</label>
+                      <select value={newInsId} onChange={e => setNewInsId(e.target.value)} className={inputCls}>
+                        <option value="">Select...</option>
+                        {allInsurances.filter(ins => !pharmacyInsurances.some(pi => pi.insuranceId === ins.id))
+                          .map(ins => <option key={ins.id} value={ins.id}>{ins.providerName}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-slate-600 dark:text-gray-400 mb-1 block">Coverage % for your pharmacy</label>
+                      <input type="number" min="0" max="100" value={newInsCoverage} onChange={e => setNewInsCoverage(+e.target.value)} className={inputCls} />
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={addInsurance} disabled={!newInsId} className="px-4 py-2 bg-sky-500 hover:bg-sky-600 disabled:bg-sky-300 text-white rounded-lg text-sm font-semibold transition-colors">Add</button>
+                      <button onClick={() => setAddingIns(false)} className="px-4 py-2 border border-slate-200 dark:border-gray-700 text-slate-600 dark:text-gray-400 rounded-lg text-sm hover:bg-slate-50 dark:hover:bg-gray-800 transition-colors">Cancel</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-xs font-semibold text-slate-600 dark:text-gray-400 mb-1 block uppercase tracking-wider">New Insurance Company Name</label>
+                      <input
+                        type="text"
+                        value={newInsName}
+                        onChange={e => setNewInsName(e.target.value)}
+                        placeholder="e.g. RAMA, MMI, Soras..."
+                        className={inputCls}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-slate-600 dark:text-gray-400 mb-1 block uppercase tracking-wider">Default Coverage %</label>
+                      <input
+                        type="number" min="0" max="100"
+                        value={newInsDefaultCoverage}
+                        onChange={e => setNewInsDefaultCoverage(+e.target.value)}
+                        className={inputCls}
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={createAndAddInsurance}
+                        disabled={!newInsName.trim() || creatingIns}
+                        className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-300 text-white rounded-lg text-sm font-semibold transition-colors flex items-center gap-2"
+                      >
+                        {creatingIns ? <><span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Creating...</> : '✨ Create & Add'}
+                      </button>
+                      <button onClick={() => setAddingIns(false)} className="px-4 py-2 border border-slate-200 dark:border-gray-700 text-slate-600 dark:text-gray-400 rounded-lg text-sm hover:bg-slate-50 dark:hover:bg-gray-800 transition-colors">Cancel</button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

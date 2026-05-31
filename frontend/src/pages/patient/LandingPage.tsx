@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Camera, MapPin, Filter, CalendarCheck, Stethoscope, Plus, X } from 'lucide-react';
+import { Search, Camera, MapPin, Filter, CalendarCheck, Stethoscope, Plus, X, Loader2, CheckCircle2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import api, { BASE_URL } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -21,6 +21,10 @@ export default function LandingPage() {
   const [searchText, setSearchText] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+
+  // GPS Detection
+  const [locationStatus, setLocationStatus] = useState<'idle' | 'detecting' | 'detected' | 'error'>('idle');
+  const [detectedCoords, setDetectedCoords] = useState<{ lat: number; lng: number } | null>(null);
 
   // Locations
   const [locations, setLocations] = useState<any[]>([]);
@@ -72,7 +76,14 @@ export default function LandingPage() {
   const handleSearch = () => {
     const allMeds = [...tags, ...(searchText.trim() ? [searchText.trim()] : [])];
     if (allMeds.length === 0) return;
-    navigate('/search', { state: { medicines: allMeds, locationNodeId: selectedLocationId } });
+    navigate('/search', {
+      state: {
+        medicines: allMeds,
+        locationNodeId: detectedCoords ? '' : selectedLocationId,
+        latitude: detectedCoords?.lat,
+        longitude: detectedCoords?.lng,
+      }
+    });
   };
 
   const handleFileSelected = async (file: File) => {
@@ -87,6 +98,7 @@ export default function LandingPage() {
         state: {
           medicines: res.data.medicines.map((name: string, i: number) => ({ id: `${Date.now()}-${i}`, name })),
           imageUrl: `${BASE_URL}${res.data.imageUrl}`,
+          rawImageUrl: res.data.imageUrl, // relative path for passing to search
         },
       });
     } catch {
@@ -153,7 +165,7 @@ export default function LandingPage() {
                     className="flex-1 bg-transparent outline-none text-slate-800 dark:text-gray-100 placeholder-slate-400 dark:placeholder-gray-600 text-sm"
                     autoComplete="off"
                   />
-                  {searchText && (
+                  {searchText.trim() && (
                     <button onClick={() => addTag()} className="text-sky-500 hover:text-sky-700 text-xs font-bold flex items-center gap-1">
                       <Plus size={14} /> {t('landing.addTag')}
                     </button>
@@ -184,17 +196,48 @@ export default function LandingPage() {
 
             {/* Location Selector */}
             <div className="mt-4">
-              <label className="text-xs font-semibold text-slate-500 mb-1.5 block">Search Location (Optional)</label>
+              <label className="text-xs font-semibold text-slate-500 dark:text-gray-400 mb-1.5 block">Search Location (Optional)</label>
               <select
                 value={selectedLocationId}
-                onChange={e => setSelectedLocationId(e.target.value)}
-                className="w-full border-2 border-slate-200 dark:border-gray-700 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 bg-slate-50 dark:bg-gray-800 dark:text-white transition-all"
+                onChange={e => { setSelectedLocationId(e.target.value); setDetectedCoords(null); setLocationStatus('idle'); }}
+                disabled={locationStatus === 'detected'}
+                className="w-full border-2 border-slate-200 dark:border-gray-700 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 bg-slate-50 dark:bg-gray-800 dark:text-white transition-all disabled:opacity-50"
               >
-                <option value="">Auto-detect my location</option>
+                <option value="">Select a location...</option>
                 {locations.map(loc => (
                   <option key={loc.id} value={loc.id}>{loc.name} ({loc.type})</option>
                 ))}
               </select>
+
+              {/* GPS detection */}
+              <button
+                type="button"
+                onClick={async () => {
+                  setLocationStatus('detecting');
+                  try {
+                    const pos = await new Promise<GeolocationPosition>((res, rej) =>
+                      navigator.geolocation.getCurrentPosition(res, rej, { timeout: 8000 })
+                    );
+                    setDetectedCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+                    setSelectedLocationId('');
+                    setLocationStatus('detected');
+                  } catch {
+                    setLocationStatus('error');
+                  }
+                }}
+                className="flex items-center gap-2 mt-2 text-sm font-semibold transition-colors"
+                style={{ color: locationStatus === 'detected' ? '#16a34a' : locationStatus === 'error' ? '#dc2626' : '#0ea5e9' }}
+              >
+                {locationStatus === 'detecting'
+                  ? <Loader2 size={14} className="animate-spin" />
+                  : locationStatus === 'detected'
+                  ? <CheckCircle2 size={14} />
+                  : <MapPin size={14} />}
+                {locationStatus === 'detecting' ? 'Detecting...' :
+                 locationStatus === 'detected' ? '✓ Location detected — using GPS coordinates' :
+                 locationStatus === 'error' ? '⚠ Could not detect. Use dropdown above.' :
+                 t('landing.autoDetect')}
+              </button>
             </div>
 
             <div className="mt-4 flex items-center gap-3">

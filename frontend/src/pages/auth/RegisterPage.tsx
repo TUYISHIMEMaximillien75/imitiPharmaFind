@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Pill, User, Mail, Lock, Phone, Building2, FileText, ChevronRight, ChevronLeft, AlertCircle, CheckCircle, Eye, EyeOff } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Pill, User, Mail, Lock, Phone, Building2, FileText, ChevronRight, ChevronLeft, AlertCircle, CheckCircle, Eye, EyeOff, Upload } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 
@@ -9,7 +9,10 @@ type Step = 1 | 2 | 3;
 
 export default function RegisterPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const fromState = (location.state as any)?.from;
   const { t } = useTranslation();
+  const licenseFileRef = useRef<HTMLInputElement>(null);
   const [step, setStep] = useState<Step>(1);
   const [role, setRole] = useState<Role>('PATIENT');
   const [form, setForm] = useState({
@@ -26,6 +29,8 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [licenseFile, setLicenseFile] = useState<File | null>(null);
+  const [registeredPharmacyId, setRegisteredPharmacyId] = useState<string | null>(null);
   // Issue #8 — show password toggle
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -44,7 +49,7 @@ export default function RegisterPage() {
     }
     setIsLoading(true);
     try {
-      await api.post('/auth/register', {
+      const res = await api.post('/auth/register', {
         email: form.email,
         password: form.password,
         firstName: form.firstName,
@@ -57,6 +62,18 @@ export default function RegisterPage() {
           address: form.address,
         }),
       });
+      // After pharmacist registration, try to upload license doc
+      const pharmacyId = res.data?.pharmacy?.id;
+      if (pharmacyId) setRegisteredPharmacyId(pharmacyId);
+      if (pharmacyId && licenseFile) {
+        try {
+          const fd = new FormData();
+          fd.append('licenseDocument', licenseFile);
+          await api.post(`/pharmacies/${pharmacyId}/upload-license`, fd, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          });
+        } catch { /* non-blocking — license upload failure should not block registration */ }
+      }
       setSuccess(true);
     } catch (err: any) {
       setError(err.response?.data?.message || t('auth.registrationFailed'));
@@ -81,8 +98,11 @@ export default function RegisterPage() {
           ) : (
             <p className="text-slate-400 mb-6">Your account is ready. Sign in to start finding medicines near you.</p>
           )}
-          <button onClick={() => navigate('/login')} className="w-full bg-sky-500 hover:bg-sky-400 text-white font-semibold py-3 rounded-xl transition-all">
-            Go to Login
+          <button
+            onClick={() => navigate('/login', { state: fromState ? { from: fromState } : undefined })}
+            className="w-full bg-sky-500 hover:bg-sky-400 text-white font-semibold py-3 rounded-xl transition-all"
+          >
+            {fromState ? 'Sign In to Continue' : 'Go to Login'}
           </button>
         </div>
       </div>
@@ -265,6 +285,27 @@ export default function RegisterPage() {
                 <div>
                   <label className={labelClass}>Address / Location</label>
                   <input id="reg-address" type="text" value={form.address} onChange={(e) => update('address', e.target.value)} placeholder="KN 5 Rd, Musanze" className={inputClass} />
+                </div>
+                <div>
+                  <label className={labelClass}><Upload size={14} className="inline mr-1" />License Document (PDF or Image)</label>
+                  <input
+                    ref={licenseFileRef}
+                    type="file"
+                    accept="image/*,.pdf"
+                    className="hidden"
+                    onChange={e => setLicenseFile(e.target.files?.[0] || null)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => licenseFileRef.current?.click()}
+                    className="w-full border-2 border-dashed border-white/20 hover:border-sky-500 rounded-xl px-4 py-3 text-sm text-slate-400 hover:text-sky-400 transition-all text-left flex items-center gap-2"
+                  >
+                    <Upload size={16} />
+                    {licenseFile ? (
+                      <span className="text-green-400 font-medium">✓ {licenseFile.name}</span>
+                    ) : 'Choose license file...'}
+                  </button>
+                  <p className="text-xs text-slate-500 mt-1">Accepted: JPG, PNG, PDF (max 10 MB). Helps admin review faster.</p>
                 </div>
               </div>
               <div className="flex gap-3 mt-6">

@@ -7,12 +7,13 @@ interface Pharmacy {
   id: string;
   name: string;
   licenseNumber: string;
+  licenseDocumentUrl?: string;
   address?: string;
   phone?: string;
   status: 'PENDING' | 'ACTIVE' | 'REJECTED' | 'SUSPENDED';
   rejectionReason?: string;
   createdAt: string;
-  owner?: { email: string; firstName?: string; lastName?: string };
+  owner?: { email: string; firstName?: string; lastName?: string; phone?: string };
 }
 
 export default function AdminDashboard() {
@@ -132,9 +133,23 @@ export default function AdminDashboard() {
                       {p.address && <p className="text-xs text-slate-400 dark:text-gray-500 mt-0.5">{p.address}</p>}
                     </td>
                     <td className="p-4 text-sm text-slate-600 dark:text-gray-400">
-                      {p.owner ? `${p.owner.firstName || ''} ${p.owner.lastName || ''}`.trim() || p.owner.email : '—'}
+                      <p>{p.owner ? `${p.owner.firstName || ''} ${p.owner.lastName || ''}`.trim() || p.owner.email : '—'}</p>
+                      {p.owner?.email && <p className="text-xs text-slate-400 dark:text-gray-500">{p.owner.email}</p>}
+                      {p.phone && <p className="text-xs text-slate-400 dark:text-gray-500">📞 {p.phone}</p>}
                     </td>
-                    <td className="p-4 font-mono text-xs text-slate-600 dark:text-gray-400 bg-slate-50 dark:bg-gray-800">{p.licenseNumber}</td>
+                    <td className="p-4">
+                      <p className="font-mono text-xs text-slate-600 dark:text-gray-400">{p.licenseNumber}</p>
+                      {p.licenseDocumentUrl && (
+                        <a
+                          href={`http://localhost:3000${p.licenseDocumentUrl}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs text-sky-500 hover:underline font-semibold flex items-center gap-1 mt-0.5"
+                        >
+                          📄 View License Doc ↗
+                        </a>
+                      )}
+                    </td>
                     <td className="p-4 text-sm text-slate-500 dark:text-gray-500">{new Date(p.createdAt).toLocaleDateString()}</td>
                     <td className="p-4">
                       {p.status === 'PENDING'  && <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 text-sm font-semibold"><Clock size={14} /> {t('reservations.pending')}</span>}

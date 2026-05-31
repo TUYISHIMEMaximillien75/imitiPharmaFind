@@ -20,10 +20,10 @@ export class InsurancesController {
     return this.insurancesService.findAll();
   }
 
-  /** Admin only: add a new insurance provider */
+  /** Admin or Pharmacist: add a new insurance provider */
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.PHARMACIST)
   @ApiBearerAuth('JWT')
   create(@Body() body: { providerName: string; defaultCoveragePercentage?: number }) {
     return this.insurancesService.create(body);

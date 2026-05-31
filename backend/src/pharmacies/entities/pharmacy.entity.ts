@@ -68,6 +68,9 @@ export class Pharmacy {
   @Column({ nullable: true, type: 'text' })
   rejectionReason: string | null;
 
+  @Column({ nullable: true, type: 'text' })
+  licenseDocumentUrl: string | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

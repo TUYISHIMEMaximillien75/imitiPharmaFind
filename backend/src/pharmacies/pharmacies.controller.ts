@@ -1,7 +1,11 @@
 import {
   Controller, Get, Patch, Post, Delete, Param, Body,
-  UseGuards, Request, ForbiddenException,
+  UseGuards, Request, ForbiddenException, UseInterceptors,
+  UploadedFile, BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname, join } from 'path';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { PharmaciesService } from './pharmacies.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -135,5 +139,40 @@ export class PharmaciesController {
     if (pharmacy.owner?.id !== req.user.id) {
       throw new ForbiddenException('You can only manage your own pharmacy');
     }
+  }
+
+  /** Pharmacist: upload license document (PDF or image) */
+  @Post(':id/upload-license')
+  @ApiBearerAuth('JWT')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.PHARMACIST, UserRole.ADMIN)
+  @UseInterceptors(
+    FileInterceptor('licenseDocument', {
+      storage: diskStorage({
+        destination: join(process.cwd(), 'uploads'),
+        filename: (_req, file, cb) => {
+          const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
+          cb(null, `license-${unique}${extname(file.originalname)}`);
+        },
+      }),
+      limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+      fileFilter: (_req, file, cb) => {
+        const allowed = /\.(pdf|jpg|jpeg|png|gif|webp)$/i;
+        if (!allowed.test(file.originalname)) {
+          return cb(new BadRequestException('Only PDF and image files are allowed'), false);
+        }
+        cb(null, true);
+      },
+    }),
+  )
+  async uploadLicense(
+    @Param('id') pharmacyId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Request() req: any,
+  ) {
+    if (!file) throw new BadRequestException('No file uploaded');
+    await this.ensureOwnerOrAdmin(pharmacyId, req);
+    const url = `/uploads/${file.filename}`;
+    return this.pharmaciesService.update(pharmacyId, { licenseDocumentUrl: url } as any);
   }
 }

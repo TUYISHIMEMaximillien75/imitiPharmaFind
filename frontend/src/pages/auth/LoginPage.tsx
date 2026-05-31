@@ -19,7 +19,9 @@ export default function LoginPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
-  const from = (location.state as any)?.from?.pathname || '/';
+  const fromState = (location.state as any)?.from;
+  const from = fromState?.pathname || '/';
+  const fromSearchState = fromState?.state || null;
 
   const [form, setForm] = useState({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
@@ -39,7 +41,7 @@ export default function LoginPage() {
       // Redirect based on role
       if (user.role === 'ADMIN') navigate('/admin', { replace: true });
       else if (user.role === 'PHARMACIST') navigate('/pharmacist', { replace: true });
-      else navigate(from === '/login' ? '/' : from, { replace: true });
+      else navigate(from === '/login' || from === '/' ? '/' : from, { replace: true, state: fromSearchState });
     } catch (err: any) {
       setError(err.response?.data?.message || 'Invalid email or password');
     } finally {
@@ -153,7 +155,7 @@ export default function LoginPage() {
 
           <p className="text-center text-slate-500 text-sm mt-6">
             {t('auth.noAccount')}{' '}
-            <Link to="/register" className="text-sky-400 hover:text-sky-300 font-semibold transition-colors">
+            <Link to="/register" state={location.state} className="text-sky-400 hover:text-sky-300 font-semibold transition-colors">
               {t('auth.createAccount')}
             </Link>
           </p>

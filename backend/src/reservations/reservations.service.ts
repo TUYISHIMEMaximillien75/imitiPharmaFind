@@ -32,6 +32,9 @@ export class ReservationsService {
     deliveryOption?: any;
     deliveryAddress?: string;
     deliveryDistanceKm?: number;
+    insuranceId?: string;
+    insuranceNumber?: string;
+    insurancePrescriptionUrl?: string;
   }) {
     let totalAmount = 0;
     const reservationItems: Partial<ReservationItem>[] = [];
@@ -65,9 +68,16 @@ export class ReservationsService {
     if (!pharmacy) throw new BadRequestException(`Pharmacy not found`);
 
     let insurancePays = 0;
-    if (patient?.isInsuranceVerified && patient.insuranceProvider) {
+    // Insurance only applies when BOTH an insuranceId AND a prescription image are provided
+    const hasInsuranceWithPrescription = (
+      (data.insuranceId || (patient?.isInsuranceVerified && patient.insuranceProvider)) &&
+      (data.insurancePrescriptionUrl || data.prescriptionImageUrl)
+    );
+
+    if (hasInsuranceWithPrescription) {
+      const effectiveInsuranceId = data.insuranceId ?? patient?.insuranceProvider?.id;
       const pi = pharmacy.pharmacyInsurances?.find(
-        (p) => p.insurance?.id === patient.insuranceProvider.id,
+        (p) => p.insurance?.id === effectiveInsuranceId,
       );
       if (pi) {
         const coverage = Number(pi.coveragePercentage ?? pi.insurance?.defaultCoveragePercentage ?? 0);
@@ -90,6 +100,8 @@ export class ReservationsService {
       patient: { id: patientId },
       pharmacyId: data.pharmacyId,
       prescriptionImageUrl: data.prescriptionImageUrl,
+      insuranceNumber: data.insuranceNumber ?? null,
+      insurancePrescriptionUrl: data.insurancePrescriptionUrl ?? null,
       notes: data.notes,
       totalAmount,
       patientPays,

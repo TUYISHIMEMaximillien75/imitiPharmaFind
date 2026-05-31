@@ -76,6 +76,12 @@ export class Reservation {
   @Column({ nullable: true })
   prescriptionImageUrl: string;
 
+  @Column({ nullable: true, type: 'varchar' })
+  insuranceNumber: string | null;
+
+  @Column({ nullable: true, type: 'text' })
+  insurancePrescriptionUrl: string | null;
+
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
   totalAmount: number;
 

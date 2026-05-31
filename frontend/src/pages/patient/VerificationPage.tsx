@@ -10,7 +10,7 @@ export default function VerificationPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const state = location.state as { medicines?: Medicine[]; imageUrl?: string } | null;
+  const state = location.state as { medicines?: Medicine[]; imageUrl?: string; rawImageUrl?: string } | null;
 
   const [medicines, setMedicines] = useState<Medicine[]>(state?.medicines || []);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -53,7 +53,12 @@ export default function VerificationPage() {
         });
       }
     } catch { /* non-blocking */ }
-    navigate('/search', { state: { medicines: validMeds.map(m => m.name) } });
+    navigate('/search', {
+      state: {
+        medicines: validMeds.map(m => m.name),
+        prescriptionImageUrl: state?.rawImageUrl || (state?.imageUrl ? state.imageUrl.replace('http://localhost:3000', '') : undefined),
+      }
+    });
   };
 
   return (

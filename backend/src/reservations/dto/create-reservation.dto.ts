@@ -48,4 +48,16 @@ export class CreateReservationDto {
   @IsNumber()
   @Type(() => Number)
   deliveryDistanceKm?: number;
+
+  @IsOptional()
+  @IsString()
+  insuranceId?: string;
+
+  @IsOptional()
+  @IsString()
+  insuranceNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  insurancePrescriptionUrl?: string;
 }

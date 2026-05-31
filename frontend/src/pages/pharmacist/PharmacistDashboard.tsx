@@ -28,6 +28,8 @@ interface Reservation {
   totalAmount: number;
   patientPays: number;
   insurancePays: number;
+  insuranceNumber?: string;
+  prescriptionImageUrl?: string;
   notes?: string;
   rejectionReason?: string;
   createdAt: string;
@@ -608,7 +610,40 @@ export default function PharmacistDashboard() {
             </div>
 
             {selectedRes.notes && (
-              <p className="text-sm text-slate-500 bg-slate-50 rounded-xl p-3 mb-4">📝 {selectedRes.notes}</p>
+              <p className="text-sm text-slate-500 bg-slate-50 dark:bg-gray-800 rounded-xl p-3 mb-4">📝 {selectedRes.notes}</p>
+            )}
+
+            {/* Prescription attachment */}
+            {selectedRes.prescriptionImageUrl && (
+              <div className="mb-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl px-3 py-2 flex items-center gap-2">
+                <span className="text-xs text-green-700 dark:text-green-400 font-semibold flex-1">📎 Prescription attached</span>
+                <a
+                  href={`http://localhost:3000${selectedRes.prescriptionImageUrl}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs text-green-600 dark:text-green-400 underline font-bold hover:text-green-800"
+                >
+                  View ↗
+                </a>
+              </div>
+            )}
+
+            {/* Insurance number */}
+            {selectedRes.insurancePays > 0 && selectedRes.insuranceNumber && (
+              <div className="mb-4 bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 rounded-xl px-3 py-2">
+                <p className="text-xs text-sky-700 dark:text-sky-400 font-semibold">
+                  🛡️ Insurance #: <span className="font-mono">{selectedRes.insuranceNumber}</span>
+                </p>
+              </div>
+            )}
+
+            {/* Insurance without prescription warning */}
+            {selectedRes.insurancePays > 0 && !selectedRes.prescriptionImageUrl && (
+              <div className="mb-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl px-3 py-2">
+                <p className="text-xs text-amber-700 dark:text-amber-400 font-semibold">
+                  ⚠️ Patient claimed insurance but did not attach a prescription. Please request one before confirming.
+                </p>
+              </div>
             )}
 
             {selectedRes.status === 'PENDING' && (
