@@ -24,6 +24,12 @@ export class LocationService {
     });
   }
 
+  async getAllNodes(): Promise<LocationNode[]> {
+    return this.locationNodeRepo.find({
+      order: { type: 'ASC', name: 'ASC' },
+    });
+  }
+
   async getNodeById(id: string): Promise<LocationNode | null> {
     return this.locationNodeRepo.findOne({ where: { id } });
   }

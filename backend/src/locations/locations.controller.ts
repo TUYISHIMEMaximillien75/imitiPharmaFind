@@ -9,4 +9,9 @@ export class LocationsController {
   async getHierarchy(@Query('parentId') parentId?: string) {
     return this.locationService.getNodes(parentId);
   }
+
+  @Get('all')
+  async getAll() {
+    return this.locationService.getAllNodes();
+  }
 }

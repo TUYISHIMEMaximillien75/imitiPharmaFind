@@ -36,7 +36,11 @@ export default function LandingPage() {
 
   useEffect(() => {
     api.get('/medicines').then(res => setAllMedicines(res.data)).catch(() => {});
-    api.get('/locations/hierarchy').then(res => setLocations(res.data)).catch(() => {});
+    api.get('/locations/all').then(res => {
+      // Only show locations that have valid latitude/longitude for calculating distance
+      const withCoords = res.data.filter((loc: any) => loc.latitude && loc.longitude);
+      setLocations(withCoords);
+    }).catch(() => {});
   }, []);
 
   // Close dropdown on outside click
