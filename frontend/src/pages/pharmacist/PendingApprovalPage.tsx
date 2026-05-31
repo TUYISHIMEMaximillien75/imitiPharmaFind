@@ -118,7 +118,7 @@ export default function PendingApprovalPage() {
         {isRejected && (
           <div className="mt-6">
             <a
-              href="mailto:support@imitipharmafind.rw"
+              href="mailto:umuhirebelyse23@gmail.com"
               className="inline-flex items-center gap-2 px-5 py-2.5 bg-sky-500 hover:bg-sky-600 text-white font-semibold rounded-xl transition-colors text-sm"
             >
               <CheckCircle size={16} /> {t('pending.contactSupport')}
@@ -128,7 +128,7 @@ export default function PendingApprovalPage() {
 
         <p className="text-slate-400 dark:text-gray-600 text-sm mt-6">
           {t('pending.needHelp')}{' '}
-          <a href="mailto:support@imitipharmafind.rw" className="text-sky-500 hover:underline">support@imitipharmafind.rw</a>
+          <a href="mailto:umuhirebelyse23@gmail.com" className="text-sky-500 hover:underline">umuhirebelyse23@gmail.com</a>
         </p>
       </div>
     </div>

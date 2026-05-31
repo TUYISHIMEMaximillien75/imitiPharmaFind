@@ -10,7 +10,7 @@ export default function Footer() {
       <p>{t('footer.rights', { year })}</p>
       <p className="mt-1 text-xs">{t('footer.madeWith')}</p>
       <a
-        href="mailto:support@imitipharmafind.rw"
+        href="mailto:umuhirebelyse23@gmail.com"
         className="inline-flex items-center gap-1.5 mt-2 text-xs text-sky-500 hover:text-sky-400 hover:underline transition-colors"
       >
         <Mail size={12} /> {t('footer.contactSupport', 'Contact Support')}
