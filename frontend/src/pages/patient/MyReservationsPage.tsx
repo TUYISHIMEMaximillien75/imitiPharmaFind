@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   ClipboardList, Package, Clock, CheckCircle, XCircle, AlertCircle,
-  ChevronRight, X, Bell, CreditCard, Shield, Smartphone, CheckCircle2
+  ChevronRight, X, Bell, CreditCard, Shield, Smartphone, CheckCircle2,
+  Banknote, Lock
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import api from '../../services/api';
+import api, { BASE_URL } from '../../services/api';
 
 interface ReservationItem {
   id: string;
@@ -55,9 +56,9 @@ export default function MyReservationsPage() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
 
-  // MoMo payment state
+  // Mock payment state
   const [payingId, setPayingId] = useState<string | null>(null);
-  const [paySuccess, setPaySuccess] = useState(false);
+  const [payStep, setPayStep] = useState<'confirm' | 'processing' | 'done'>('confirm');
   const [isPaying, setIsPaying] = useState(false);
 
   // Real-time status notifications
@@ -114,18 +115,31 @@ export default function MyReservationsPage() {
   };
 
   const handlePayOnline = async (reservationId: string) => {
+    setPayStep('processing');
     setIsPaying(true);
     try {
       await api.post(`/reservations/${reservationId}/pay-online`);
-      setPaySuccess(true);
+      // Simulate a brief processing delay for realism
+      await new Promise(r => setTimeout(r, 1800));
+      setPayStep('done');
       await fetchReservations(1, false, true);
-      // Update selected too
       setSelected(prev => prev && prev.id === reservationId ? { ...prev, paymentStatus: 'PAID' } : prev);
     } catch (err: any) {
       alert(err.response?.data?.message || 'Payment confirmation failed. Please try again.');
+      setPayStep('confirm');
     } finally {
       setIsPaying(false);
     }
+  };
+
+  const openPayModal = (id: string) => {
+    setPayingId(id);
+    setPayStep('confirm');
+  };
+
+  const closePayModal = () => {
+    setPayingId(null);
+    setPayStep('confirm');
   };
 
   const payingReservation = reservations.find(r => r.id === payingId);
@@ -342,7 +356,7 @@ export default function MyReservationsPage() {
             {/* Prescription link */}
             {selected.prescriptionImageUrl && (
               <div className="mb-4">
-                <a href={`http://localhost:3000${selected.prescriptionImageUrl}`} target="_blank" rel="noreferrer"
+                <a href={`${BASE_URL}${selected.prescriptionImageUrl}`} target="_blank" rel="noreferrer"
                   className="text-xs text-sky-600 hover:underline flex items-center gap-1 font-semibold">
                   📎 View attached prescription
                 </a>
@@ -363,10 +377,10 @@ export default function MyReservationsPage() {
             {/* Pay Now button */}
             {selected.status === 'CONFIRMED' && selected.paymentMethod === 'PAY_ONLINE' && selected.paymentStatus !== 'PAID' && (
               <button
-                onClick={() => { setPayingId(selected.id); setPaySuccess(false); }}
+                onClick={() => openPayModal(selected.id)}
                 className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-2xl transition-all mb-3 flex items-center justify-center gap-2"
               >
-                <Smartphone size={18} /> Pay Now — {Number(selected.patientPays ?? selected.totalAmount).toLocaleString()} RWF
+                <Banknote size={18} /> Pay Now — {Number(selected.patientPays ?? selected.totalAmount).toLocaleString()} RWF
               </button>
             )}
 
@@ -384,60 +398,117 @@ export default function MyReservationsPage() {
         </div>
       )}
 
-      {/* MoMo Payment Modal */}
+      {/* Mock Payment Modal */}
       {payingId && payingReservation && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-sm p-6 animate-in zoom-in-95 duration-200">
-            {paySuccess ? (
-              <div className="text-center py-4">
-                <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <CheckCircle2 size={36} className="text-green-500" />
-                </div>
-                <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">✅ Payment Confirmed!</h3>
-                <p className="text-slate-500 dark:text-gray-400 text-sm mb-6">The pharmacy has been notified. Your reservation is now paid.</p>
-                <button onClick={() => { setPayingId(null); setPaySuccess(false); }}
-                  className="w-full bg-sky-500 text-white font-bold py-3 rounded-2xl hover:bg-sky-600 transition-colors">
-                  Done
-                </button>
-              </div>
-            ) : (
-              <>
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="font-bold text-slate-800 dark:text-white text-lg flex items-center gap-2">
-                    <Smartphone size={20} className="text-sky-500" /> Mobile Money Payment
-                  </h3>
-                  <button onClick={() => setPayingId(null)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-gray-800">
-                    <X size={16} className="text-slate-500" />
-                  </button>
-                </div>
+          <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
 
-                <div className="bg-gradient-to-br from-sky-500 to-blue-600 rounded-2xl p-5 text-white text-center mb-5">
-                  <p className="text-xs font-semibold uppercase tracking-widest opacity-75 mb-2">Dial on your phone</p>
-                  <p className="text-2xl font-black tracking-widest font-mono">*182*8*1*PHARMA2026#</p>
-                  <div className="mt-3 border-t border-white/20 pt-3">
-                    <p className="text-xs opacity-75">Amount</p>
-                    <p className="text-xl font-bold">{Number(payingReservation.patientPays ?? payingReservation.totalAmount).toLocaleString()} RWF</p>
-                    <p className="text-xs opacity-75 mt-1">To: {payingReservation.pharmacy.name}</p>
+            {/* ── Step 1: Confirm ── */}
+            {payStep === 'confirm' && (
+              <>
+                {/* Header */}
+                <div className="bg-gradient-to-r from-sky-500 to-blue-600 px-6 pt-6 pb-8 text-white relative">
+                  <button onClick={closePayModal} className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30">
+                    <X size={16} />
+                  </button>
+                  <div className="flex items-center gap-3 mb-1">
+                    <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+                      <Smartphone size={20} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold opacity-75 uppercase tracking-widest">Mobile Money</p>
+                      <h3 className="text-lg font-bold">Confirm Payment</h3>
+                    </div>
                   </div>
                 </div>
 
-                <p className="text-sm text-slate-500 dark:text-gray-400 text-center mb-5">
-                  Dial the code above, follow the prompts, and enter your MoMo PIN. Once the transaction is complete, click below.
-                </p>
-
-                <button
-                  onClick={() => handlePayOnline(payingId)}
-                  disabled={isPaying}
-                  className="w-full bg-green-500 hover:bg-green-600 disabled:bg-green-300 text-white font-bold py-3 rounded-2xl transition-all flex items-center justify-center gap-2"
-                >
-                  {isPaying ? (
-                    <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Confirming...</>
-                  ) : (
-                    <><CheckCircle2 size={18} /> I Have Paid</>
+                {/* Transaction details card */}
+                <div className="-mt-4 mx-4 bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-slate-100 dark:border-gray-700 p-4 mb-4">
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="text-xs font-semibold text-slate-500 dark:text-gray-400 uppercase tracking-wider">Pay to</span>
+                    <span className="text-sm font-bold text-slate-800 dark:text-white">{payingReservation.pharmacy.name}</span>
+                  </div>
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="text-xs font-semibold text-slate-500 dark:text-gray-400 uppercase tracking-wider">Medicines</span>
+                    <span className="text-sm text-slate-700 dark:text-gray-300">{payingReservation.items.length} item{payingReservation.items.length !== 1 ? 's' : ''}</span>
+                  </div>
+                  {payingReservation.items.map(item => (
+                    <div key={item.id} className="flex justify-between items-center py-1.5 border-t border-slate-50 dark:border-gray-700">
+                      <span className="text-xs text-slate-600 dark:text-gray-400">{item.medicine.name} ×{item.quantity}</span>
+                      <span className="text-xs font-semibold text-slate-700 dark:text-gray-300">{(item.priceAtReservation * item.quantity).toLocaleString()} RWF</span>
+                    </div>
+                  ))}
+                  {Number(payingReservation.insurancePays) > 0 && (
+                    <div className="flex justify-between items-center py-1.5 border-t border-slate-50 dark:border-gray-700">
+                      <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1"><Shield size={10} /> Insurance covers</span>
+                      <span className="text-xs font-semibold text-green-600 dark:text-green-400">-{Number(payingReservation.insurancePays).toLocaleString()} RWF</span>
+                    </div>
                   )}
-                </button>
+                  <div className="flex justify-between items-center pt-3 border-t-2 border-slate-100 dark:border-gray-700 mt-1">
+                    <span className="text-sm font-bold text-slate-700 dark:text-gray-200">Total to Pay</span>
+                    <span className="text-xl font-extrabold text-sky-600 dark:text-sky-400">{Number(payingReservation.patientPays ?? payingReservation.totalAmount).toLocaleString()} RWF</span>
+                  </div>
+                </div>
+
+                <div className="px-4 pb-4 space-y-2">
+                  <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-gray-400 bg-slate-50 dark:bg-gray-800 rounded-xl px-3 py-2">
+                    <Lock size={12} className="text-green-500 shrink-0" />
+                    This is a simulated payment. No real money will be charged.
+                  </div>
+                  <button
+                    onClick={() => handlePayOnline(payingId)}
+                    className="w-full bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white font-bold py-3.5 rounded-2xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-sky-500/30"
+                  >
+                    <Smartphone size={18} /> Confirm & Pay
+                  </button>
+                  <button onClick={closePayModal} className="w-full text-slate-500 dark:text-gray-400 text-sm py-2 hover:text-slate-700 dark:hover:text-gray-200 transition-colors">
+                    Cancel
+                  </button>
+                </div>
               </>
             )}
+
+            {/* ── Step 2: Processing ── */}
+            {payStep === 'processing' && (
+              <div className="p-10 text-center">
+                <div className="relative w-20 h-20 mx-auto mb-6">
+                  <div className="absolute inset-0 rounded-full border-4 border-sky-100 dark:border-sky-900" />
+                  <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-sky-500 animate-spin" />
+                  <div className="absolute inset-2 bg-sky-50 dark:bg-sky-900/30 rounded-full flex items-center justify-center">
+                    <Smartphone size={24} className="text-sky-500" />
+                  </div>
+                </div>
+                <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-2">Processing Payment…</h3>
+                <p className="text-sm text-slate-500 dark:text-gray-400">Please wait while we process your payment securely.</p>
+              </div>
+            )}
+
+            {/* ── Step 3: Success ── */}
+            {payStep === 'done' && (
+              <div className="p-8 text-center">
+                <div className="w-20 h-20 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <CheckCircle2 size={40} className="text-green-500" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-1">Payment Successful! 🎉</h3>
+                <p className="text-slate-500 dark:text-gray-400 text-sm mb-2">
+                  {Number(payingReservation.patientPays ?? payingReservation.totalAmount).toLocaleString()} RWF paid to {payingReservation.pharmacy.name}
+                </p>
+                <p className="text-xs text-slate-400 dark:text-gray-500 mb-6">The pharmacy has been notified and will prepare your medicines.</p>
+                <div className="bg-green-50 dark:bg-green-900/20 rounded-2xl p-4 mb-6 text-left">
+                  <p className="text-xs font-semibold text-green-700 dark:text-green-400 mb-1">Transaction Details</p>
+                  <p className="text-xs text-green-600 dark:text-green-400">Ref: TXN-{Date.now().toString(36).toUpperCase()}</p>
+                  <p className="text-xs text-green-600 dark:text-green-400">Date: {new Date().toLocaleString()}</p>
+                  <p className="text-xs text-green-600 dark:text-green-400">Status: PAID ✓</p>
+                </div>
+                <button
+                  onClick={closePayModal}
+                  className="w-full bg-sky-500 text-white font-bold py-3 rounded-2xl hover:bg-sky-600 transition-colors"
+                >
+                  Done
+                </button>
+              </div>
+            )}
+
           </div>
         </div>
       )}

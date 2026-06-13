@@ -79,6 +79,24 @@ export class PharmaciesController {
     return this.pharmaciesService.reject(id, reason);
   }
 
+  /** Admin: suspend (block) an active pharmacy */
+  @Patch(':id/suspend')
+  @ApiBearerAuth('JWT')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  suspend(@Param('id') id: string, @Body('reason') reason?: string) {
+    return this.pharmaciesService.suspend(id, reason);
+  }
+
+  /** Admin: re-activate a suspended pharmacy */
+  @Patch(':id/reactivate')
+  @ApiBearerAuth('JWT')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  reactivate(@Param('id') id: string) {
+    return this.pharmaciesService.reactivate(id);
+  }
+
   /* ─── Per-pharmacy Insurance endpoints (Issue #7) ─── */
 
   /** List insurances accepted by this pharmacy (with coverage %) */

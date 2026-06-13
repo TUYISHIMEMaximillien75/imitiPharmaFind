@@ -17,9 +17,17 @@ export class LocationService {
         order: { name: 'ASC' },
       });
     }
-    // If no parentId, return the top level (PROVINCE or DISTRICT, depending on what we seed as root)
+    // If no parentId, return the top level (PROVINCE)
     return this.locationNodeRepo.find({
-      where: { type: LocationType.PROVINCE }, // Assuming PROVINCE is the root
+      where: { type: LocationType.PROVINCE },
+      order: { name: 'ASC' },
+    });
+  }
+
+  /** Get direct children of a node (for cascading picker) */
+  async getChildren(parentId: string): Promise<LocationNode[]> {
+    return this.locationNodeRepo.find({
+      where: { parent: { id: parentId } },
       order: { name: 'ASC' },
     });
   }

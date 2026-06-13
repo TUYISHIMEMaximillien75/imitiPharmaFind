@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ShieldCheck, Building2, FileCheck, CheckCircle, XCircle, Clock, AlertCircle, RefreshCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import api from '../../services/api';
+import api, { BASE_URL } from '../../services/api';
 
 interface Pharmacy {
   id: string;
@@ -62,9 +62,31 @@ export default function AdminDashboard() {
     } finally { setProcessingId(null); }
   };
 
-  const pending  = pharmacies.filter(p => p.status === 'PENDING');
-  const active   = pharmacies.filter(p => p.status === 'ACTIVE');
-  const rejected = pharmacies.filter(p => p.status === 'REJECTED');
+  const handleSuspend = async (id: string) => {
+    if (!confirm('Are you sure you want to suspend this pharmacy? It will be hidden from patients.')) return;
+    setProcessingId(id);
+    try {
+      await api.patch(`/pharmacies/${id}/suspend`, { reason: 'Suspended by admin' });
+      setPharmacies(pharmacies.map(p => p.id === id ? { ...p, status: 'SUSPENDED' } : p));
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to suspend');
+    } finally { setProcessingId(null); }
+  };
+
+  const handleReactivate = async (id: string) => {
+    setProcessingId(id);
+    try {
+      await api.patch(`/pharmacies/${id}/reactivate`);
+      setPharmacies(pharmacies.map(p => p.id === id ? { ...p, status: 'ACTIVE' } : p));
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to reactivate');
+    } finally { setProcessingId(null); }
+  };
+
+  const pending    = pharmacies.filter(p => p.status === 'PENDING');
+  const active     = pharmacies.filter(p => p.status === 'ACTIVE');
+  const rejected   = pharmacies.filter(p => p.status === 'REJECTED');
+  const suspended  = pharmacies.filter(p => p.status === 'SUSPENDED');
 
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-in fade-in duration-500">
@@ -85,11 +107,12 @@ export default function AdminDashboard() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-4 gap-4 mb-8">
         {[
-          { label: t('reservations.pending'),   count: pending.length,  color: 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800' },
-          { label: t('admin.approved'),          count: active.length,   color: 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' },
-          { label: t('admin.rejected'),          count: rejected.length, color: 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800' },
+          { label: t('reservations.pending'),   count: pending.length,    color: 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800' },
+          { label: t('admin.approved'),          count: active.length,     color: 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' },
+          { label: t('admin.rejected'),          count: rejected.length,   color: 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800' },
+          { label: 'Suspended',                  count: suspended.length,  color: 'text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800' },
         ].map(s => (
           <div key={s.label} className={`rounded-2xl border p-4 text-center ${s.color}`}>
             <p className="text-3xl font-extrabold">{s.count}</p>
@@ -135,13 +158,13 @@ export default function AdminDashboard() {
                     <td className="p-4 text-sm text-slate-600 dark:text-gray-400">
                       <p>{p.owner ? `${p.owner.firstName || ''} ${p.owner.lastName || ''}`.trim() || p.owner.email : '—'}</p>
                       {p.owner?.email && <p className="text-xs text-slate-400 dark:text-gray-500">{p.owner.email}</p>}
-                      {p.phone && <p className="text-xs text-slate-400 dark:text-gray-500">📞 {p.phone}</p>}
+                      {(p.phone || p.owner?.phone) && <p className="text-xs text-slate-400 dark:text-gray-500">📞 {p.phone || p.owner?.phone}</p>}
                     </td>
                     <td className="p-4">
                       <p className="font-mono text-xs text-slate-600 dark:text-gray-400">{p.licenseNumber}</p>
                       {p.licenseDocumentUrl && (
                         <a
-                          href={`http://localhost:3000${p.licenseDocumentUrl}`}
+                          href={`${BASE_URL}${p.licenseDocumentUrl}`}
                           target="_blank"
                           rel="noreferrer"
                           className="text-xs text-sky-500 hover:underline font-semibold flex items-center gap-1 mt-0.5"
@@ -152,9 +175,10 @@ export default function AdminDashboard() {
                     </td>
                     <td className="p-4 text-sm text-slate-500 dark:text-gray-500">{new Date(p.createdAt).toLocaleDateString()}</td>
                     <td className="p-4">
-                      {p.status === 'PENDING'  && <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 text-sm font-semibold"><Clock size={14} /> {t('reservations.pending')}</span>}
-                      {p.status === 'ACTIVE'   && <span className="flex items-center gap-1 text-green-600 dark:text-green-400 text-sm font-semibold"><CheckCircle size={14} /> {t('admin.approved')}</span>}
-                      {p.status === 'REJECTED' && <span className="flex items-center gap-1 text-red-500 dark:text-red-400 text-sm font-semibold"><XCircle size={14} /> {t('admin.rejected')}</span>}
+                      {p.status === 'PENDING'    && <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 text-sm font-semibold"><Clock size={14} /> {t('reservations.pending')}</span>}
+                      {p.status === 'ACTIVE'     && <span className="flex items-center gap-1 text-green-600 dark:text-green-400 text-sm font-semibold"><CheckCircle size={14} /> {t('admin.approved')}</span>}
+                      {p.status === 'REJECTED'   && <span className="flex items-center gap-1 text-red-500 dark:text-red-400 text-sm font-semibold"><XCircle size={14} /> {t('admin.rejected')}</span>}
+                      {p.status === 'SUSPENDED'  && <span className="flex items-center gap-1 text-orange-600 dark:text-orange-400 text-sm font-semibold"><XCircle size={14} /> Suspended</span>}
                     </td>
                     <td className="p-4 text-right">
                       {p.status === 'PENDING' && (
@@ -187,8 +211,26 @@ export default function AdminDashboard() {
                           )}
                         </div>
                       )}
-                      {p.status === 'ACTIVE'   && <span className="text-slate-400 dark:text-gray-600 text-sm font-medium">Active ✓</span>}
+                      {p.status === 'ACTIVE' && (
+                        <button
+                          onClick={() => handleSuspend(p.id)}
+                          disabled={processingId === p.id}
+                          className="flex items-center gap-1.5 px-3 py-1.5 border border-orange-200 dark:border-orange-800 text-orange-600 dark:text-orange-400 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-900/20 font-semibold text-sm transition-colors disabled:opacity-50"
+                        >
+                          <XCircle size={14} /> {processingId === p.id ? '...' : 'Suspend'}
+                        </button>
+                      )}
+                      {p.status === 'SUSPENDED' && (
+                        <button
+                          onClick={() => handleReactivate(p.id)}
+                          disabled={processingId === p.id}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500 hover:bg-green-600 disabled:bg-green-300 text-white rounded-lg font-semibold text-sm transition-colors"
+                        >
+                          <CheckCircle size={14} /> {processingId === p.id ? '...' : 'Re-activate'}
+                        </button>
+                      )}
                       {p.status === 'REJECTED' && <span className="text-slate-400 dark:text-gray-600 text-xs">{p.rejectionReason}</span>}
+                      {p.status === 'SUSPENDED' && p.rejectionReason && <span className="text-slate-400 dark:text-gray-600 text-xs">{p.rejectionReason}</span>}
                     </td>
                   </tr>
                 ))}

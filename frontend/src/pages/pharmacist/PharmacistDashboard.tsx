@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Package, ClipboardList, Plus, Search, Pencil, Trash2, Save, X, CheckCircle, XCircle, AlertCircle, RefreshCw, Bell, Settings } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import api from '../../services/api';
+import api, { BASE_URL } from '../../services/api';
 import PharmacistSettings from './PharmacistSettings';
 import { useAuth } from '../../context/AuthContext';
 
@@ -618,7 +618,7 @@ export default function PharmacistDashboard() {
               <div className="mb-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl px-3 py-2 flex items-center gap-2">
                 <span className="text-xs text-green-700 dark:text-green-400 font-semibold flex-1">📎 Prescription attached</span>
                 <a
-                  href={`http://localhost:3000${selectedRes.prescriptionImageUrl}`}
+                  href={`${BASE_URL}${selectedRes.prescriptionImageUrl}`}
                   target="_blank"
                   rel="noreferrer"
                   className="text-xs text-green-600 dark:text-green-400 underline font-bold hover:text-green-800"

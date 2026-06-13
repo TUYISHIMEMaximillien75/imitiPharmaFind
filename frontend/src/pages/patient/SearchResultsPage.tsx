@@ -111,23 +111,24 @@ export default function SearchResultsPage() {
     setIsLoading(true);
     setError('');
     try {
-      let latitude = state?.latitude || -1.5;
-      let longitude = state?.longitude || 29.6;
+      let latitude = state?.latitude;
+      let longitude = state?.longitude;
 
-      if (!state?.latitude) {
+      // Only try GPS if user didn't manually pick a location and no coords were passed
+      if (!initialLocationNodeId && !latitude) {
         try {
           const pos = await new Promise<GeolocationPosition>((res, rej) =>
             navigator.geolocation.getCurrentPosition(res, rej, { timeout: 5000 }));
           latitude = pos.coords.latitude;
           longitude = pos.coords.longitude;
           setUserCoords({ lat: latitude, lng: longitude });
-        } catch { /* use defaults */ }
+        } catch { /* use backend default */ }
       }
 
       const res = await api.post('/search', {
         medicineNames: medicines,
-        latitude,
-        longitude,
+        ...(latitude ? { latitude } : {}),
+        ...(longitude ? { longitude } : {}),
         locationNodeId: initialLocationNodeId || undefined,
         ...((insId ?? selectedInsuranceId) ? { insuranceId: insId ?? selectedInsuranceId } : {}),
       });

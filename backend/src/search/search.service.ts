@@ -29,12 +29,30 @@ export class SearchService {
 
     if (locationNodeId) {
       const node = await this.locationService.getNodeById(locationNodeId);
-      if (node && node.latitude && node.longitude) {
+      if (node?.latitude && node?.longitude) {
         latitude = node.latitude;
         longitude = node.longitude;
+        this.logger.log(`Resolved location "${node.name}" to (${latitude}, ${longitude})`);
+      } else if (node) {
+        this.logger.warn(`Location node "${node.name}" has no coordinates — searching with parent or default coords`);
+        // Try to walk up the hierarchy to find a parent with coordinates
+        const allNodes = await this.locationService.getAllNodes();
+        const findWithCoords = (id: string): any => {
+          const n = allNodes.find(x => x.id === id);
+          if (!n) return null;
+          if (n.latitude && n.longitude) return n;
+          const parent = allNodes.find(x => x.children?.some((c: any) => c.id === n.id));
+          return parent ? findWithCoords(parent.id) : null;
+        };
+        const ancestor = findWithCoords(locationNodeId);
+        if (ancestor) {
+          latitude = ancestor.latitude;
+          longitude = ancestor.longitude;
+          this.logger.log(`Using ancestor "${ancestor.name}" coords (${latitude}, ${longitude})`);
+        }
       }
     }
-    
+
     // Fallback if still no lat/long
     latitude = latitude ?? -1.5020; // Default Musanze lat
     longitude = longitude ?? 29.6350; // Default Musanze lng

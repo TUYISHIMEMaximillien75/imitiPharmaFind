@@ -63,14 +63,18 @@ export default function RegisterPage() {
         }),
       });
       // After pharmacist registration, try to upload license doc
-      const pharmacyId = res.data?.pharmacy?.id;
+      const pharmacyId = res.data?.user?.pharmacy?.id;
+      const token = res.data?.access_token;
       if (pharmacyId) setRegisteredPharmacyId(pharmacyId);
-      if (pharmacyId && licenseFile) {
+      if (pharmacyId && licenseFile && token) {
         try {
           const fd = new FormData();
           fd.append('licenseDocument', licenseFile);
           await api.post(`/pharmacies/${pharmacyId}/upload-license`, fd, {
-            headers: { 'Content-Type': 'multipart/form-data' },
+            headers: { 
+              'Content-Type': 'multipart/form-data',
+              'Authorization': `Bearer ${token}`
+            },
           });
         } catch { /* non-blocking — license upload failure should not block registration */ }
       }

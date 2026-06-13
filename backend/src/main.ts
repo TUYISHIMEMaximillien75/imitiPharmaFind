@@ -1,3 +1,15 @@
+const dns = require('dns');
+const originalLookup = dns.lookup;
+(dns as any).lookup = (hostname: string, options: any, callback: any) => {
+  if (typeof options === 'function') {
+    callback = options;
+    options = { family: 4 };
+  } else if (options) {
+    options.family = 4;
+  }
+  return originalLookup(hostname, options, callback);
+};
+
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { NestExpressApplication } from '@nestjs/platform-express';

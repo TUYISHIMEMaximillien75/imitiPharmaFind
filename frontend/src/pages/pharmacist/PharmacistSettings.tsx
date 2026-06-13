@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import {
   Clock, Shield, User, Save, Plus, Trash2, Pencil,
-  CheckCircle, X, AlertCircle, ChevronLeft, ChevronRight, Package,
+  CheckCircle, X, AlertCircle, ChevronLeft, ChevronRight, Package, MapPin,
 } from 'lucide-react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useTranslation } from 'react-i18next';
+import RwandaLocationPicker from '../../components/ui/RwandaLocationPicker';
 
 interface Insurance {
   id: string;
@@ -27,7 +28,7 @@ interface InvItem {
   medicine: { id: string; name: string; category: string };
 }
 
-type SettingsTab = 'profile' | 'hours' | 'insurance';
+type SettingsTab = 'profile' | 'hours' | 'insurance' | 'location';
 
 const PAGE_SIZE = 8;
 
@@ -48,6 +49,11 @@ export default function PharmacistSettings() {
 
   // Hours form
   const [hours, setHours] = useState({ openingTime: 8, closingTime: 20 });
+
+  // Location
+  const [selectedLocNode, setSelectedLocNode] = useState<any>(null);
+  const [savingLocation, setSavingLocation] = useState(false);
+  const [locationSaveMsg, setLocationSaveMsg] = useState('');
 
   // Insurance state
   const [allInsurances, setAllInsurances] = useState<Insurance[]>([]);
@@ -100,6 +106,32 @@ export default function PharmacistSettings() {
   useEffect(() => {
     if (tab === 'insurance') loadPharmacyInsurances();
   }, [tab, pharmacyId]);
+
+  /* ── Save location ── */
+  const saveLocation = async () => {
+    if (!selectedLocNode || !pharmacyId) return;
+    setSavingLocation(true); setLocationSaveMsg('');
+    try {
+      const body: any = {
+        locationLatitude:  selectedLocNode.latitude  ?? null,
+        locationLongitude: selectedLocNode.longitude ?? null,
+      };
+      // Build the location embedded object based on what level was selected
+      if (selectedLocNode.type === 'PROVINCE') {
+        body.location = { province: selectedLocNode.name, latitude: selectedLocNode.latitude, longitude: selectedLocNode.longitude };
+      } else if (selectedLocNode.type === 'DISTRICT') {
+        body.location = { province: selectedLocNode.provinceName ?? '', district: selectedLocNode.name, latitude: selectedLocNode.latitude, longitude: selectedLocNode.longitude };
+      } else if (selectedLocNode.type === 'SECTOR') {
+        body.location = { province: selectedLocNode.provinceName ?? '', district: selectedLocNode.districtName ?? '', sector: selectedLocNode.name, latitude: selectedLocNode.latitude, longitude: selectedLocNode.longitude };
+      }
+      await api.patch(`/pharmacies/${pharmacyId}`, body);
+      setLocationSaveMsg('📍 Location saved! Your pharmacy will now appear in searches for this area.');
+      // Update local pharmacy state
+      setPharmacy((prev: any) => prev ? { ...prev, ...body } : prev);
+      setTimeout(() => setLocationSaveMsg(''), 5000);
+    } catch { setLocationSaveMsg('❌ Failed to save location. Please try again.'); }
+    finally { setSavingLocation(false); }
+  };
 
   /* ── Save profile ── */
   const saveProfile = async () => {
@@ -284,9 +316,10 @@ export default function PharmacistSettings() {
       {/* Tabs */}
       <div className="flex bg-slate-100 dark:bg-gray-800 p-1 rounded-xl border border-slate-200 dark:border-gray-700 mb-6 w-fit">
         {([
-          { key: 'profile', label: t('settings.profile', 'Profile'), icon: User },
-          { key: 'hours', label: t('settings.hours', 'Hours'), icon: Clock },
-          { key: 'insurance', label: t('settings.insurance', 'Insurance'), icon: Shield },
+          { key: 'profile',   label: t('settings.profile', 'Profile'),     icon: User },
+          { key: 'hours',     label: t('settings.hours', 'Hours'),           icon: Clock },
+          { key: 'location',  label: 'Location',                              icon: MapPin },
+          { key: 'insurance', label: t('settings.insurance', 'Insurance'),   icon: Shield },
         ] as { key: SettingsTab; label: string; icon: any }[]).map(({ key, label, icon: Icon }) => (
           <button key={key} onClick={() => { setTab(key); setSaveMsg(''); setSaveError(''); }}
             className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${
@@ -384,6 +417,66 @@ export default function PharmacistSettings() {
             <button onClick={saveHours} disabled={saving} className="px-6 py-2.5 bg-sky-500 hover:bg-sky-600 disabled:bg-sky-300 text-white font-semibold rounded-xl transition-all shadow-md shadow-sky-500/20 flex items-center gap-2 mt-6">
               <Save size={18} /> {saving ? t('common.saving', 'Saving...') : t('settings.saveHours', 'Save Hours')}
             </button>
+        </div>
+      )}
+
+      {/* ── Insurance Tab ── */}
+      {/* ── Location Tab ── */}
+      {tab === 'location' && (
+        <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 max-w-xl">
+          <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-2 flex items-center gap-2">
+            <MapPin className="text-sky-500" /> Pharmacy Location
+          </h2>
+          <p className="text-sm text-slate-500 dark:text-gray-400 mb-6">
+            Set your pharmacy's location so patients can find you. Select down to the sector level for the most accurate results.
+          </p>
+
+          {/* Current location badge */}
+          {pharmacy?.location?.sector && (
+            <div className="flex items-center gap-2 bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-400 rounded-2xl px-4 py-3 mb-5 text-sm">
+              <MapPin size={15} />
+              <div>
+                <p className="font-semibold">Current location:</p>
+                <p className="text-xs opacity-80">
+                  {[pharmacy.location.province, pharmacy.location.district, pharmacy.location.sector].filter(Boolean).join(' → ')}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Cascading picker */}
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-slate-200 dark:border-gray-800 p-5 mb-5">
+            <p className="text-xs font-semibold text-slate-500 dark:text-gray-400 uppercase tracking-wider mb-4">Select New Location</p>
+            <RwandaLocationPicker
+              onSelect={node => setSelectedLocNode(node)}
+            />
+          </div>
+
+          {/* Save feedback */}
+          {locationSaveMsg && (
+            <div className={`flex items-center gap-2 rounded-xl px-4 py-3 text-sm mb-4 border ${
+              locationSaveMsg.startsWith('❌')
+                ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-400'
+                : 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-400'
+            }`}>
+              {locationSaveMsg}
+            </div>
+          )}
+
+          <button
+            onClick={saveLocation}
+            disabled={!selectedLocNode || savingLocation}
+            className="px-6 py-2.5 bg-sky-500 hover:bg-sky-600 disabled:bg-slate-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed text-white disabled:text-slate-400 font-semibold rounded-xl transition-all shadow-md shadow-sky-500/20 flex items-center gap-2"
+          >
+            <Save size={18} />
+            {savingLocation ? 'Saving...' : 'Save Location'}
+          </button>
+
+          {!selectedLocNode && (
+            <p className="text-xs text-slate-400 dark:text-gray-500 mt-2">
+              Select at least a Province to enable saving.
+            </p>
+          )}
         </div>
       )}
 

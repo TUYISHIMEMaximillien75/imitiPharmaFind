@@ -49,7 +49,7 @@ export class AuthService {
 
     await this.usersRepository.save(user);
 
-    return { message: 'Registration successful. Please log in.' };
+    return this.login({ email, password });
   }
 
   async login(data: any): Promise<any> {
@@ -78,6 +78,8 @@ export class AuthService {
         firstName: user.firstName,
         lastName: user.lastName,
         phone: user.phone,
+        insuranceNumber: user.insuranceNumber,
+        isInsuranceVerified: user.isInsuranceVerified,
         role: user.role,
         pharmacy: user.pharmacy
           ? {
@@ -107,6 +109,8 @@ export class AuthService {
         firstName: user.firstName,
         lastName: user.lastName,
         phone: user.phone,
+        insuranceNumber: user.insuranceNumber,
+        isInsuranceVerified: user.isInsuranceVerified,
         role: user.role,
         pharmacy: user.pharmacy
           ? {

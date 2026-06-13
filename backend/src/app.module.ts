@@ -71,6 +71,7 @@ import { PharmacyInsurance } from './pharmacies/entities/pharmacy-insurance.enti
             ? {
                 url: dbUrl,
                 ssl: { rejectUnauthorized: false },
+                extra: { connectionTimeoutMillis: 30000 }
               }
             : {
                 // Otherwise use local DB config

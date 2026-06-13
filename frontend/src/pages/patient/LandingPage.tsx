@@ -4,6 +4,7 @@ import { Search, Camera, MapPin, Filter, CalendarCheck, Stethoscope, Plus, X, Lo
 import { useTranslation } from 'react-i18next';
 import api, { BASE_URL } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import RwandaLocationPicker from '../../components/ui/RwandaLocationPicker';
 
 interface MedicineSuggestion {
   id: string;
@@ -26,9 +27,8 @@ export default function LandingPage() {
   const [locationStatus, setLocationStatus] = useState<'idle' | 'detecting' | 'detected' | 'error'>('idle');
   const [detectedCoords, setDetectedCoords] = useState<{ lat: number; lng: number } | null>(null);
 
-  // Locations
-  const [locations, setLocations] = useState<any[]>([]);
-  const [selectedLocationId, setSelectedLocationId] = useState('');
+  // Selected location node from cascading picker
+  const [selectedNode, setSelectedNode] = useState<{ id: string; name: string; latitude?: number; longitude?: number } | null>(null);
 
   // Issue #10 — autocomplete
   const [allMedicines, setAllMedicines] = useState<MedicineSuggestion[]>([]);
@@ -36,11 +36,6 @@ export default function LandingPage() {
 
   useEffect(() => {
     api.get('/medicines').then(res => setAllMedicines(res.data)).catch(() => {});
-    api.get('/locations/all').then(res => {
-      // Only show locations that have valid latitude/longitude for calculating distance
-      const withCoords = res.data.filter((loc: any) => loc.latitude && loc.longitude);
-      setLocations(withCoords);
-    }).catch(() => {});
   }, []);
 
   // Close dropdown on outside click
@@ -83,7 +78,7 @@ export default function LandingPage() {
     navigate('/search', {
       state: {
         medicines: allMeds,
-        locationNodeId: detectedCoords ? '' : selectedLocationId,
+        locationNodeId: detectedCoords ? '' : (selectedNode?.id ?? ''),
         latitude: detectedCoords?.lat,
         longitude: detectedCoords?.lng,
       }
@@ -200,48 +195,60 @@ export default function LandingPage() {
 
             {/* Location Selector */}
             <div className="mt-4">
-              <label className="text-xs font-semibold text-slate-500 dark:text-gray-400 mb-1.5 block">Search Location (Optional)</label>
-              <select
-                value={selectedLocationId}
-                onChange={e => { setSelectedLocationId(e.target.value); setDetectedCoords(null); setLocationStatus('idle'); }}
-                disabled={locationStatus === 'detected'}
-                className="w-full border-2 border-slate-200 dark:border-gray-700 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-sky-500 bg-slate-50 dark:bg-gray-800 dark:text-white transition-all disabled:opacity-50"
-              >
-                <option value="">Select a location...</option>
-                {locations.map(loc => (
-                  <option key={loc.id} value={loc.id}>{loc.name} ({loc.type})</option>
-                ))}
-              </select>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-semibold text-slate-500 dark:text-gray-400 uppercase tracking-wider">Search Location</label>
+                {locationStatus === 'detected' && (
+                  <button
+                    onClick={() => { setDetectedCoords(null); setLocationStatus('idle'); }}
+                    className="text-xs text-red-400 hover:text-red-600 flex items-center gap-1 transition-colors"
+                  >
+                    <X size={11} /> Clear GPS
+                  </button>
+                )}
+              </div>
 
-              {/* GPS detection */}
-              <button
-                type="button"
-                onClick={async () => {
-                  setLocationStatus('detecting');
-                  try {
-                    const pos = await new Promise<GeolocationPosition>((res, rej) =>
-                      navigator.geolocation.getCurrentPosition(res, rej, { timeout: 8000 })
-                    );
-                    setDetectedCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-                    setSelectedLocationId('');
-                    setLocationStatus('detected');
-                  } catch {
-                    setLocationStatus('error');
-                  }
-                }}
-                className="flex items-center gap-2 mt-2 text-sm font-semibold transition-colors"
-                style={{ color: locationStatus === 'detected' ? '#16a34a' : locationStatus === 'error' ? '#dc2626' : '#0ea5e9' }}
-              >
-                {locationStatus === 'detecting'
-                  ? <Loader2 size={14} className="animate-spin" />
-                  : locationStatus === 'detected'
-                  ? <CheckCircle2 size={14} />
-                  : <MapPin size={14} />}
-                {locationStatus === 'detecting' ? 'Detecting...' :
-                 locationStatus === 'detected' ? '✓ Location detected — using GPS coordinates' :
-                 locationStatus === 'error' ? '⚠ Could not detect. Use dropdown above.' :
-                 t('landing.autoDetect')}
-              </button>
+              {locationStatus === 'detected' ? (
+                <div className="flex items-center gap-2 text-sm font-semibold text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-2xl px-4 py-3">
+                  <CheckCircle2 size={16} />
+                  Using GPS coordinates
+                  <span className="text-xs font-normal opacity-70 ml-auto">
+                    ({detectedCoords?.lat.toFixed(4)}, {detectedCoords?.lng.toFixed(4)})
+                  </span>
+                </div>
+              ) : (
+                <RwandaLocationPicker
+                  onSelect={node => setSelectedNode(node)}
+                />
+              )}
+
+              {/* GPS detection — or use Cascading picker above */}
+              {locationStatus !== 'detected' && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setLocationStatus('detecting');
+                    try {
+                      const pos = await new Promise<GeolocationPosition>((res, rej) =>
+                        navigator.geolocation.getCurrentPosition(res, rej, { timeout: 8000 })
+                      );
+                      setDetectedCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+                      setSelectedNode(null);
+                      setLocationStatus('detected');
+                    } catch {
+                      setLocationStatus('error');
+                    }
+                  }}
+                  className="flex items-center gap-2 mt-2 text-sm font-semibold transition-colors"
+                  style={{ color: locationStatus === 'error' ? '#dc2626' : '#0ea5e9' }}
+                >
+                  {locationStatus === 'detecting'
+                    ? <Loader2 size={14} className="animate-spin" />
+                    : <MapPin size={14} />}
+                  {locationStatus === 'detecting' ? 'Detecting your location...' :
+                   locationStatus === 'error' ? '⚠ Could not detect. Select manually above.' :
+                   t('landing.autoDetect')}
+                </button>
+              )}
             </div>
 
             <div className="mt-4 flex items-center gap-3">

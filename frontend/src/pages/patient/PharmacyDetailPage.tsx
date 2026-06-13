@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, MapPin, Phone, Clock, Package, CheckCircle2,
-  XCircle, Loader2, Shield, AlertCircle,
+  XCircle, Loader2, Shield, AlertCircle, Calendar, Info, Pill,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
@@ -11,7 +11,8 @@ interface InventoryItem {
   id: string;
   stock: number;
   price: number;
-  medicine: { id: string; name: string; category: string };
+  expiryDate?: string;
+  medicine: { id: string; name: string; category: string; description?: string; requiresPrescription?: boolean; imageUrl?: string };
 }
 
 interface PharmacyInsurance {
@@ -217,43 +218,108 @@ export default function PharmacyDetailPage() {
         {filtered.length === 0 ? (
           <p className="text-slate-400 text-sm text-center py-8">{t('pharmacy.noMedicinesFound')}</p>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {filtered.map(inv => {
               const isOut = inv.stock === 0;
               const isLow = inv.stock > 0 && inv.stock <= 10;
+              const fullPrice = Number(inv.price);
               const insuredPrice = selectedInsurance
-                ? Math.round(Number(inv.price) * (1 - coveragePct / 100))
+                ? Math.round(fullPrice * (1 - coveragePct / 100))
                 : null;
+              const savings = insuredPrice !== null ? fullPrice - insuredPrice : 0;
+
+              const isExpired = inv.expiryDate ? new Date(inv.expiryDate) < new Date() : false;
+              const isNearExpiry = inv.expiryDate && !isExpired
+                ? (new Date(inv.expiryDate).getTime() - Date.now()) < 30 * 24 * 60 * 60 * 1000
+                : false;
+
               return (
                 <div
                   key={inv.id}
-                  className={`flex items-center justify-between rounded-2xl px-4 py-3 border ${
-                    isOut
-                      ? 'bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900 opacity-60'
+                  className={`rounded-2xl border overflow-hidden transition-all hover:shadow-md ${
+                    isOut || isExpired
+                      ? 'bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900 opacity-70'
                       : isLow
                       ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-100 dark:border-amber-900'
-                      : 'bg-slate-50 dark:bg-gray-800 border-slate-100 dark:border-gray-700'
+                      : 'bg-white dark:bg-gray-800 border-slate-100 dark:border-gray-700'
                   }`}
                 >
-                  <div>
-                    <p className="text-sm font-semibold text-slate-800 dark:text-white">{inv.medicine.name}</p>
-                    <p className="text-xs text-slate-400 dark:text-gray-500 capitalize">{inv.medicine.category?.toLowerCase()}</p>
+                  {/* Medicine Header */}
+                  <div className="flex items-start gap-3 p-4 border-b border-slate-100 dark:border-gray-700">
+                    <div className="w-10 h-10 bg-sky-100 dark:bg-sky-900/30 rounded-xl flex items-center justify-center shrink-0">
+                      {inv.medicine.imageUrl
+                        ? <img src={inv.medicine.imageUrl} alt={inv.medicine.name} className="w-full h-full object-cover rounded-xl" onError={e => { (e.target as HTMLImageElement).style.display='none'; }} />
+                        : <Pill size={18} className="text-sky-500" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-sm font-bold text-slate-800 dark:text-white leading-tight">{inv.medicine.name}</p>
+                        <div className="flex flex-col items-end gap-0.5 shrink-0">
+                          {isOut ? (
+                            <span className="text-[10px] font-bold bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-full">{t('common.outOfStock')}</span>
+                          ) : isExpired ? (
+                            <span className="text-[10px] font-bold bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-full">Expired</span>
+                          ) : isLow ? (
+                            <span className="text-[10px] font-bold bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full">{t('common.lowStock', { count: inv.stock })}</span>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 dark:text-gray-500 font-medium">{inv.stock} {t('common.inStock')}</span>
+                          )}
+                          {inv.medicine.requiresPrescription && (
+                            <span className="text-[10px] font-bold bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 px-2 py-0.5 rounded-full">Rx Required</span>
+                          )}
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-semibold text-slate-400 dark:text-gray-500 uppercase tracking-wider">{inv.medicine.category?.toLowerCase()}</span>
+                    </div>
                   </div>
-                  <div className="text-right shrink-0">
+
+                  {/* Description */}
+                  {inv.medicine.description && (
+                    <div className="px-4 pt-3 flex items-start gap-2">
+                      <Info size={12} className="text-slate-400 mt-0.5 shrink-0" />
+                      <p className="text-xs text-slate-500 dark:text-gray-400 leading-relaxed">{inv.medicine.description}</p>
+                    </div>
+                  )}
+
+                  {/* Expiry Date */}
+                  {inv.expiryDate && (
+                    <div className={`mx-4 mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold ${
+                      isExpired
+                        ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
+                        : isNearExpiry
+                        ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
+                        : 'bg-slate-100 dark:bg-gray-700 text-slate-500 dark:text-gray-400'
+                    }`}>
+                      <Calendar size={12} />
+                      {isExpired ? 'Expired: ' : isNearExpiry ? 'Expires soon: ' : 'Expires: '}
+                      {new Date(inv.expiryDate).toLocaleDateString()}
+                    </div>
+                  )}
+
+                  {/* Pricing Section */}
+                  <div className="p-4 mt-1">
                     {insuredPrice !== null ? (
-                      <>
-                        <p className="text-xs line-through text-slate-400 dark:text-gray-500">{Number(inv.price).toLocaleString()} RWF</p>
-                        <p className="text-sm font-bold text-green-600 dark:text-green-400">{insuredPrice.toLocaleString()} RWF</p>
-                      </>
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-slate-500 dark:text-gray-400">Full price</span>
+                          <span className="text-xs text-slate-400 dark:text-gray-500 line-through">{fullPrice.toLocaleString()} RWF</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                            <Shield size={10} /> Insurance covers {coveragePct}%
+                          </span>
+                          <span className="text-xs text-green-600 dark:text-green-400 font-semibold">-{savings.toLocaleString()} RWF</span>
+                        </div>
+                        <div className="flex justify-between items-center border-t border-slate-100 dark:border-gray-700 pt-1.5">
+                          <span className="text-sm font-bold text-slate-700 dark:text-gray-200">You pay</span>
+                          <span className="text-base font-extrabold text-sky-600 dark:text-sky-400">{insuredPrice.toLocaleString()} RWF</span>
+                        </div>
+                      </div>
                     ) : (
-                      <p className="text-sm font-bold text-slate-800 dark:text-white">{Number(inv.price).toLocaleString()} RWF</p>
-                    )}
-                    {isOut ? (
-                      <span className="text-[10px] font-bold text-red-500">{t('common.outOfStock')}</span>
-                    ) : isLow ? (
-                      <span className="text-[10px] font-bold text-amber-600">{t('common.lowStock', { count: inv.stock })}</span>
-                    ) : (
-                      <span className="text-[10px] text-slate-400 dark:text-gray-500">{inv.stock} {t('common.inStock')}</span>
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-slate-500 dark:text-gray-400">Price</span>
+                        <span className="text-base font-extrabold text-slate-800 dark:text-white">{fullPrice.toLocaleString()} RWF</span>
+                      </div>
                     )}
                   </div>
                 </div>

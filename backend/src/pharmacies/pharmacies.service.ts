@@ -72,6 +72,24 @@ export class PharmaciesService {
     return this.findOne(id);
   }
 
+  async suspend(id: string, reason?: string) {
+    await this.pharmacyRepo.update(id, {
+      status: PharmacyStatus.SUSPENDED,
+      isActive: false,
+      rejectionReason: reason ?? null,
+    });
+    return this.findOne(id);
+  }
+
+  async reactivate(id: string) {
+    await this.pharmacyRepo.update(id, {
+      status: PharmacyStatus.ACTIVE,
+      isActive: true,
+      rejectionReason: null,
+    });
+    return this.findOne(id);
+  }
+
   /** Returns only status + rejectionReason for real-time polling */
   async getStatus(id: string) {
     const pharmacy = await this.pharmacyRepo.findOne({ where: { id }, select: ['id', 'status', 'rejectionReason'] });
