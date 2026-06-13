@@ -360,7 +360,6 @@ async function bootstrap() {
   const insurances = await insuranceRepo.save([
     { providerName: 'RAMA', defaultCoveragePercentage: 85.00 },
     { providerName: 'MMI', defaultCoveragePercentage: 85.00 },
-    { providerName: 'CBHI (Mutuelle de Santé)', defaultCoveragePercentage: 90.00 },
     { providerName: 'UAP Insurance', defaultCoveragePercentage: 100.00 },
     { providerName: 'Radiant Insurance', defaultCoveragePercentage: 80.00 },
   ]);
