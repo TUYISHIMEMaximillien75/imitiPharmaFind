@@ -354,7 +354,7 @@ async function bootstrap() {
   console.log('Database cleared. Seeding initial data...');
 
   const passwordHash = await bcrypt.hash('123456', 10);
-
+// new changes
   // 1. Seed Insurances
   const insuranceRepo = dataSource.getRepository(Insurance);
   const insurances = await insuranceRepo.save([
