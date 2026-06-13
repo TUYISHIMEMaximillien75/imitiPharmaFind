@@ -50,7 +50,17 @@ export class PharmaciesService {
   }
 
   async update(id: string, data: Partial<Pharmacy>) {
-    await this.pharmacyRepo.update(id, data);
+    const pharmacy = await this.pharmacyRepo.findOne({ where: { id } });
+    if (!pharmacy) throw new NotFoundException(`Pharmacy #${id} not found`);
+
+    // Handle embedded location update manually or let TypeORM merge it
+    if (data.location) {
+      pharmacy.location = { ...pharmacy.location, ...data.location };
+      delete data.location;
+    }
+    
+    Object.assign(pharmacy, data);
+    await this.pharmacyRepo.save(pharmacy);
     return this.findOne(id);
   }
 
