@@ -205,8 +205,9 @@ export default function SearchResultsPage() {
     return fullTotal * (1 - pct / 100);
   })();
   const insuranceSaves = fullTotal - insuredTotal;
+  // Delivery fee: 300 RWF per km, minimum 500 RWF, rounded to nearest 100
   const deliveryFee = deliveryOption === 'HOME_DELIVERY'
-    ? (reservingPharmacy?.distance ?? 0) <= 2 ? 500 : (reservingPharmacy?.distance ?? 0) <= 5 ? 1000 : 1500
+    ? Math.max(500, Math.round(((reservingPharmacy?.distance ?? 0) * 300) / 100) * 100)
     : 0;
 
   const uploadPrescriptionForInsurance = async (file: File) => {
@@ -217,11 +218,11 @@ export default function SearchResultsPage() {
       const res = await api.post('/prescriptions/temp-verify', fd, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      const url = res.data.imageUrl?.startsWith('http')
-        ? res.data.imageUrl
-        : `${BASE_URL}${res.data.imageUrl}`;
-      setModalPrescUrl(url);
-      setPrescriptionImageUrl(url);
+      // Always store the relative path (e.g. /uploads/prescriptions/xxx.jpg)
+      // Display uses BASE_URL prefix only in the UI
+      const relativePath: string = res.data.imageUrl; // e.g. /uploads/prescriptions/xxx.jpg
+      setModalPrescUrl(relativePath);
+      setPrescriptionImageUrl(relativePath);
     } catch {
       alert('Could not upload prescription. Please try again.');
     } finally {
@@ -600,7 +601,7 @@ export default function SearchResultsPage() {
                           <div className="flex items-center gap-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl px-3 py-2">
                             <CheckCircle2 size={14} className="text-green-500 shrink-0" />
                             <span className="text-xs text-green-700 dark:text-green-400 font-semibold flex-1">✓ Prescription attached</span>
-                            <button onClick={() => window.open(modalPrescUrl, '_blank')} className="text-xs text-green-600 underline">View</button>
+                            <button onClick={() => window.open(modalPrescUrl?.startsWith('http') ? modalPrescUrl : `${BASE_URL}${modalPrescUrl}`, '_blank')} className="text-xs text-green-600 underline">View</button>
                           </div>
                         ) : (
                           <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-3">
@@ -667,7 +668,7 @@ export default function SearchResultsPage() {
                       </div>
                       {deliveryFee > 0 && (
                         <div className="flex justify-between text-slate-500 dark:text-gray-400">
-                          <span>Delivery fee</span>
+                          <span>Delivery ({reservingPharmacy?.distance?.toFixed(1)} km × 300 RWF/km)</span>
                           <span>+{deliveryFee.toLocaleString()} RWF</span>
                         </div>
                       )}
@@ -680,7 +681,7 @@ export default function SearchResultsPage() {
                     <>
                       {deliveryFee > 0 && (
                         <div className="flex justify-between text-slate-500 dark:text-gray-400">
-                          <span>Delivery fee</span>
+                          <span>Delivery ({reservingPharmacy?.distance?.toFixed(1)} km × 300 RWF/km)</span>
                           <span>+{deliveryFee.toLocaleString()} RWF</span>
                         </div>
                       )}

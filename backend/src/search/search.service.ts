@@ -57,9 +57,9 @@ export class SearchService {
     latitude = latitude ?? -1.5020; // Default Musanze lat
     longitude = longitude ?? 29.6350; // Default Musanze lng
 
+    // When insurance filter is active we must INNER JOIN so only pharmacies
+    // that actually accept that insurance are returned.
     const query = this.pharmacyRepository.createQueryBuilder('pharmacy')
-      .leftJoin('pharmacy.pharmacyInsurances', 'pi')
-      .leftJoin('pi.insurance', 'insurance')
       .innerJoin('pharmacy.inventory', 'inventory', 'inventory.stock > 0')
       .innerJoin('inventory.medicine', 'medicine')
       .where(
@@ -71,9 +71,17 @@ export class SearchService {
       .andWhere('inventory.stock > 0')
       .andWhere('pharmacy.status = :status', { status: 'ACTIVE' });
 
-    // Optional insurance filter
+    // Optional insurance filter — use INNER JOIN only when filtering
     if (insuranceId) {
-      query.andWhere('insurance.id = :insuranceId', { insuranceId });
+      query
+        .innerJoin('pharmacy.pharmacyInsurances', 'pi')
+        .innerJoin('pi.insurance', 'insurance')
+        .andWhere('insurance.id = :insuranceId', { insuranceId });
+    } else {
+      // Still load insurance data for display, but don't filter by it
+      query
+        .leftJoin('pharmacy.pharmacyInsurances', 'pi')
+        .leftJoin('pi.insurance', 'insurance');
     }
 
     // Distance column (Haversine)

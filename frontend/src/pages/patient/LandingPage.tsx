@@ -49,14 +49,12 @@ export default function LandingPage() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const filtered = searchText.trim()
-    ? allMedicines
-        .filter(m =>
-          m.name.toLowerCase().includes(searchText.toLowerCase()) &&
-          !tags.includes(m.name)
-        )
-        .slice(0, 8)
-    : [];
+  const filtered = allMedicines
+    .filter(m =>
+      m.name.toLowerCase().includes(searchText.trim().toLowerCase()) &&
+      !tags.includes(m.name)
+    )
+    .slice(0, 8);
 
   const addTag = (val?: string) => {
     const name = (val ?? searchText).trim();

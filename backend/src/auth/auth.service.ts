@@ -17,7 +17,7 @@ export class AuthService {
   ) {}
 
   async register(data: any): Promise<any> {
-    const { email, password, role, firstName, lastName, phone, pharmacyName, licenseNumber, address } = data;
+    const { email, password, role, firstName, lastName, phone, pharmacyName, licenseNumber, address, latitude, longitude } = data;
 
     // Check if user exists
     const existingUser = await this.usersRepository.findOne({ where: { email } });
@@ -43,6 +43,11 @@ export class AuthService {
         address: address || '',
         status: PharmacyStatus.PENDING,
         isActive: false, // Must be approved by admin
+        // Save GPS coordinates if provided at registration
+        location: {
+          latitude: latitude ? Number(latitude) : null,
+          longitude: longitude ? Number(longitude) : null,
+        } as any,
       });
       user.pharmacy = pharmacy;
     }

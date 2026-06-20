@@ -54,6 +54,11 @@ export default function PharmacistSettings() {
   const [selectedLocNode, setSelectedLocNode] = useState<any>(null);
   const [savingLocation, setSavingLocation] = useState(false);
   const [locationSaveMsg, setLocationSaveMsg] = useState('');
+  // GPS coordinate override (exact position)
+  const [gpsPaste, setGpsPaste] = useState('');
+  const [gpsLat, setGpsLat] = useState('');
+  const [gpsLng, setGpsLng] = useState('');
+  const [gpsPasteError, setGpsPasteError] = useState('');
 
   // Insurance state
   const [allInsurances, setAllInsurances] = useState<Insurance[]>([]);
@@ -108,25 +113,49 @@ export default function PharmacistSettings() {
   }, [tab, pharmacyId]);
 
   /* ── Save location ── */
+  const handleGpsPaste = (raw: string) => {
+    setGpsPaste(raw);
+    setGpsPasteError('');
+    const parts = raw.trim().split(/[,\s]+/).filter(Boolean);
+    if (parts.length >= 2) {
+      const lat = parseFloat(parts[0]);
+      const lng = parseFloat(parts[1]);
+      if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+        setGpsLat(String(lat));
+        setGpsLng(String(lng));
+      } else {
+        setGpsPasteError('Invalid coordinates. Expected: latitude, longitude');
+      }
+    } else if (raw.trim().length > 3) {
+      setGpsPasteError('Paste both latitude and longitude (e.g. -1.9674, 30.1033)');
+    }
+  };
+
   const saveLocation = async () => {
-    if (!selectedLocNode || !pharmacyId) return;
+    if (!pharmacyId) return;
+    // Must have at least a node OR GPS coords
+    if (!selectedLocNode && !gpsLat) return;
     setSavingLocation(true); setLocationSaveMsg('');
     try {
-      const body: any = {
-        locationLatitude:  selectedLocNode.latitude  ?? null,
-        locationLongitude: selectedLocNode.longitude ?? null,
-      };
-      // Build the location embedded object based on what level was selected
-      if (selectedLocNode.type === 'PROVINCE') {
-        body.location = { province: selectedLocNode.name, latitude: selectedLocNode.latitude, longitude: selectedLocNode.longitude };
-      } else if (selectedLocNode.type === 'DISTRICT') {
-        body.location = { province: selectedLocNode.provinceName ?? '', district: selectedLocNode.name, latitude: selectedLocNode.latitude, longitude: selectedLocNode.longitude };
-      } else if (selectedLocNode.type === 'SECTOR') {
-        body.location = { province: selectedLocNode.provinceName ?? '', district: selectedLocNode.districtName ?? '', sector: selectedLocNode.name, latitude: selectedLocNode.latitude, longitude: selectedLocNode.longitude };
+      const body: any = {};
+      // Build the administrative area from the picker
+      if (selectedLocNode) {
+        if (selectedLocNode.type === 'PROVINCE') {
+          body.location = { province: selectedLocNode.name };
+        } else if (selectedLocNode.type === 'DISTRICT') {
+          body.location = { province: selectedLocNode.provinceName ?? '', district: selectedLocNode.name };
+        } else if (selectedLocNode.type === 'SECTOR') {
+          body.location = { province: selectedLocNode.provinceName ?? '', district: selectedLocNode.districtName ?? '', sector: selectedLocNode.name };
+        }
+      } else {
+        body.location = {};
+      }
+      // Override with exact GPS if provided — this is what the distance search uses
+      if (gpsLat && gpsLng) {
+        body.location = { ...(body.location ?? {}), latitude: parseFloat(gpsLat), longitude: parseFloat(gpsLng) };
       }
       await api.patch(`/pharmacies/${pharmacyId}`, body);
       setLocationSaveMsg('📍 Location saved! Your pharmacy will now appear in searches for this area.');
-      // Update local pharmacy state
       setPharmacy((prev: any) => prev ? { ...prev, ...body } : prev);
       setTimeout(() => setLocationSaveMsg(''), 5000);
     } catch { setLocationSaveMsg('❌ Failed to save location. Please try again.'); }
@@ -420,7 +449,6 @@ export default function PharmacistSettings() {
         </div>
       )}
 
-      {/* ── Insurance Tab ── */}
       {/* ── Location Tab ── */}
       {tab === 'location' && (
         <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 max-w-xl">
@@ -428,25 +456,75 @@ export default function PharmacistSettings() {
             <MapPin className="text-sky-500" /> Pharmacy Location
           </h2>
           <p className="text-sm text-slate-500 dark:text-gray-400 mb-6">
-            Set your pharmacy's location so patients can find you. Select down to the sector level for the most accurate results.
+            Set your pharmacy's location so patients can find you. The GPS coordinates are most important for accurate distance calculation.
           </p>
 
           {/* Current location badge */}
-          {pharmacy?.location?.sector && (
+          {(pharmacy?.location?.sector || pharmacy?.location?.latitude) && (
             <div className="flex items-center gap-2 bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-400 rounded-2xl px-4 py-3 mb-5 text-sm">
               <MapPin size={15} />
               <div>
                 <p className="font-semibold">Current location:</p>
                 <p className="text-xs opacity-80">
                   {[pharmacy.location.province, pharmacy.location.district, pharmacy.location.sector].filter(Boolean).join(' → ')}
+                  {pharmacy.location.latitude && pharmacy.location.longitude && (
+                    <span className="ml-2 font-mono text-green-600 dark:text-green-400">
+                      📍 {parseFloat(pharmacy.location.latitude).toFixed(5)}, {parseFloat(pharmacy.location.longitude).toFixed(5)}
+                    </span>
+                  )}
                 </p>
               </div>
             </div>
           )}
 
-          {/* Cascading picker */}
+          {/* GPS exact coordinates — most important for distance */}
+          <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded-2xl p-5 mb-5">
+            <p className="text-sm font-bold text-amber-800 dark:text-amber-300 mb-1 flex items-center gap-1.5">
+              📍 Exact GPS Coordinates
+              <span className="text-xs font-normal text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 rounded-full">Most Important</span>
+            </p>
+            <p className="text-xs text-amber-700 dark:text-amber-400 mb-3">
+              Open Google Maps → right-click on your pharmacy → copy the coordinates shown at the top of the menu.
+            </p>
+
+            {/* Paste field */}
+            <div className="mb-3">
+              <label className="text-xs font-semibold text-slate-600 dark:text-gray-400 mb-1.5 block uppercase tracking-wider">Paste Coordinates</label>
+              <input
+                type="text"
+                value={gpsPaste}
+                onChange={e => handleGpsPaste(e.target.value)}
+                placeholder="e.g. -1.9674738632351092, 30.103388462894586"
+                className="w-full bg-white dark:bg-gray-800 border border-amber-300 dark:border-amber-700 rounded-xl px-4 py-3 text-sm font-mono focus:outline-none focus:border-sky-500 transition-all"
+              />
+              {gpsPasteError && <p className="text-xs text-red-500 mt-1">{gpsPasteError}</p>}
+              {gpsLat && gpsLng && !gpsPasteError && (
+                <p className="text-xs text-green-600 dark:text-green-400 mt-1 font-medium">✓ Lat: {parseFloat(gpsLat).toFixed(6)}, Lng: {parseFloat(gpsLng).toFixed(6)}</p>
+              )}
+            </div>
+
+            {/* Manual entry */}
+            <p className="text-xs text-slate-500 mb-2">Or enter manually:</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block">Latitude</label>
+                <input type="number" step="any" value={gpsLat} onChange={e => { setGpsLat(e.target.value); setGpsPaste(gpsLng ? `${e.target.value}, ${gpsLng}` : e.target.value); }}
+                  placeholder="e.g. -1.4985"
+                  className="w-full bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-sky-500 transition-all" />
+              </div>
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block">Longitude</label>
+                <input type="number" step="any" value={gpsLng} onChange={e => { setGpsLng(e.target.value); setGpsPaste(gpsLat ? `${gpsLat}, ${e.target.value}` : e.target.value); }}
+                  placeholder="e.g. 29.6380"
+                  className="w-full bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-sky-500 transition-all" />
+              </div>
+            </div>
+          </div>
+
+          {/* Cascading picker — administrative area */}
           <div className="bg-white dark:bg-gray-900 rounded-2xl border border-slate-200 dark:border-gray-800 p-5 mb-5">
-            <p className="text-xs font-semibold text-slate-500 dark:text-gray-400 uppercase tracking-wider mb-4">Select New Location</p>
+            <p className="text-xs font-semibold text-slate-500 dark:text-gray-400 uppercase tracking-wider mb-1">Administrative Area <span className="normal-case font-normal text-slate-400">(optional — for region filtering)</span></p>
+            <p className="text-xs text-slate-400 dark:text-gray-500 mb-4">Select your Province / District / Sector so patients can filter pharmacies by area.</p>
             <RwandaLocationPicker
               onSelect={node => setSelectedLocNode(node)}
             />
@@ -465,22 +543,21 @@ export default function PharmacistSettings() {
 
           <button
             onClick={saveLocation}
-            disabled={!selectedLocNode || savingLocation}
+            disabled={(!selectedLocNode && !gpsLat) || savingLocation}
             className="px-6 py-2.5 bg-sky-500 hover:bg-sky-600 disabled:bg-slate-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed text-white disabled:text-slate-400 font-semibold rounded-xl transition-all shadow-md shadow-sky-500/20 flex items-center gap-2"
           >
             <Save size={18} />
             {savingLocation ? 'Saving...' : 'Save Location'}
           </button>
 
-          {!selectedLocNode && (
+          {(!selectedLocNode && !gpsLat) && (
             <p className="text-xs text-slate-400 dark:text-gray-500 mt-2">
-              Select at least a Province to enable saving.
+              Enter GPS coordinates or select a location area above to enable saving.
             </p>
           )}
         </div>
       )}
 
-      {/* ── Insurance Tab ── */}
       {tab === 'insurance' && (
         <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
             <div className="flex items-center justify-between mb-6">

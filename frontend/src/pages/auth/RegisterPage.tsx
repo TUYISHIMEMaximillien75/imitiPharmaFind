@@ -25,7 +25,12 @@ export default function RegisterPage() {
     pharmacyName: '',
     licenseNumber: '',
     address: '',
+    latitude: '',
+    longitude: '',
   });
+  // Single-field paste from Google Maps (e.g. "-1.9674, 30.1033")
+  const [coordsPaste, setCoordsPaste] = useState('');
+  const [coordsParseError, setCoordsParseError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
@@ -36,6 +41,28 @@ export default function RegisterPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const update = (field: string, value: string) => setForm((f) => ({ ...f, [field]: value }));
+
+  // Parse Google Maps paste: "-1.9674738, 30.103388" or "-1.9674738 30.103388"
+  const handleCoordsPaste = (raw: string) => {
+    setCoordsPaste(raw);
+    setCoordsParseError('');
+    const cleaned = raw.trim();
+    if (!cleaned) { update('latitude', ''); update('longitude', ''); return; }
+    const parts = cleaned.split(/[,\s]+/).filter(Boolean);
+    if (parts.length >= 2) {
+      const lat = parseFloat(parts[0]);
+      const lng = parseFloat(parts[1]);
+      if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+        update('latitude', String(lat));
+        update('longitude', String(lng));
+        setCoordsParseError('');
+      } else {
+        setCoordsParseError('Could not parse coordinates. Expected: latitude, longitude');
+      }
+    } else if (parts.length === 1 && cleaned.length > 3) {
+      setCoordsParseError('Paste both latitude and longitude separated by a comma.');
+    }
+  };
 
   const handleSubmit = async () => {
     setError('');
@@ -60,6 +87,8 @@ export default function RegisterPage() {
           pharmacyName: form.pharmacyName,
           licenseNumber: form.licenseNumber,
           address: form.address,
+          latitude: form.latitude ? parseFloat(form.latitude) : undefined,
+          longitude: form.longitude ? parseFloat(form.longitude) : undefined,
         }),
       });
       // After pharmacist registration, try to upload license doc
@@ -289,6 +318,57 @@ export default function RegisterPage() {
                 <div>
                   <label className={labelClass}>Address / Location</label>
                   <input id="reg-address" type="text" value={form.address} onChange={(e) => update('address', e.target.value)} placeholder="KN 5 Rd, Musanze" className={inputClass} />
+                </div>
+
+                {/* GPS Coordinates */}
+                <div>
+                  <label className={labelClass}>📍 GPS Coordinates <span className="text-sky-400 font-normal text-xs">(for map &amp; patient search)</span></label>
+
+                  {/* Single paste field */}
+                  <div className="mb-3">
+                    <label className="text-xs text-slate-400 mb-1.5 block">Paste from Google Maps <span className="text-slate-500">(right-click → copy coordinates)</span></label>
+                    <input
+                      id="reg-coords-paste"
+                      type="text"
+                      value={coordsPaste}
+                      onChange={(e) => handleCoordsPaste(e.target.value)}
+                      placeholder="e.g. -1.9674738632351092, 30.103388462894586"
+                      className={`${inputClass} font-mono text-xs`}
+                    />
+                    {coordsParseError && <p className="text-xs text-red-400 mt-1">{coordsParseError}</p>}
+                    {form.latitude && form.longitude && !coordsParseError && (
+                      <p className="text-xs text-green-400 mt-1">✓ Lat: {parseFloat(form.latitude).toFixed(6)}, Lng: {parseFloat(form.longitude).toFixed(6)}</p>
+                    )}
+                  </div>
+
+                  {/* Manual fallback */}
+                  <p className="text-xs text-slate-500 mb-2">Or enter manually:</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-slate-400 mb-1 block">Latitude</label>
+                      <input
+                        id="reg-latitude"
+                        type="number"
+                        step="any"
+                        value={form.latitude}
+                        onChange={(e) => { update('latitude', e.target.value); setCoordsPaste(form.longitude ? `${e.target.value}, ${form.longitude}` : e.target.value); }}
+                        placeholder="e.g. -1.4985"
+                        className={inputClass}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-400 mb-1 block">Longitude</label>
+                      <input
+                        id="reg-longitude"
+                        type="number"
+                        step="any"
+                        value={form.longitude}
+                        onChange={(e) => { update('longitude', e.target.value); setCoordsPaste(form.latitude ? `${form.latitude}, ${e.target.value}` : e.target.value); }}
+                        placeholder="e.g. 29.6380"
+                        className={inputClass}
+                      />
+                    </div>
+                  </div>
                 </div>
                 <div>
                   <label className={labelClass}><Upload size={14} className="inline mr-1" />License Document (PDF or Image)</label>

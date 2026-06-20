@@ -50,10 +50,10 @@ import { PharmacyInsurance } from './pharmacies/entities/pharmacy-insurance.enti
       validationOptions: { abortEarly: false },
     }),
 
-    /* ── Rate limiting: 60 requests per 60 seconds per IP (global) ── */
+    /* ── Rate limiting: 300 requests per 60 seconds per IP (global) ── */
     ThrottlerModule.forRoot([
-      { name: 'default', ttl: 60_000, limit: 60 },
-      { name: 'auth',    ttl: 60_000, limit: 10 }, // tighter for auth endpoints
+      { name: 'default', ttl: 60_000, limit: 300 },
+      { name: 'auth',    ttl: 60_000, limit: 50 }, // tighter for auth endpoints
     ]),
 
     TypeOrmModule.forRootAsync({
